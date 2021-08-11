@@ -1,0 +1,78 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "pwa-node",
+      "request": "launch",
+      "name": "Launch Program",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "program": "${workspaceFolder}/src/kafka-s3-block-uploader.ts",
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": [
+        "${workspaceFolder}/dist/lib/**/*.js"
+      ],
+      "env": {
+        "S3_ENDPOINT": "http://localhost:9000",
+        "S3_ACCESS_KEY_ID": "minioadmin",
+        "S3_SECRET_ACCESS_KEY": "minioadmin",
+        "S3_PREFIX": "blocks",
+        "S3_BUCKET": "wumbo-solana-blocks",
+        "KAFKA_BOOTSTRAP_SERVER": "localhost:29092",
+        "KAFKA_TOPIC": "json.solana.blocks",
+        // "ACCOUNTS": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
+        "ACCOUNTS": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,4K8fnycnTESeyad4DqfXPF8TbkuyscPK4EjAwY35emyW,AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
+      }
+    },
+    {
+      "type": "pwa-node",
+      "request": "launch",
+      "name": "Token Process",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "program": "${workspaceFolder}/src/event-transformer/index.ts",
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": [
+        "${workspaceFolder}/dist/lib/**/*.js"
+      ],
+      "env": {
+        "S3_ENDPOINT": "http://localhost:9000",
+        "S3_ACCESS_KEY_ID": "minioadmin",
+        "S3_SECRET_ACCESS_KEY": "minioadmin",
+        "S3_PREFIX": "blocks",
+        "S3_BUCKET": "wumbo-solana-blocks",
+        "KAFKA_BOOTSTRAP_SERVER": "localhost:29092",
+        "KAFKA_INPUT_TOPIC": "json.solana.blocks",
+        "KAFKA_OUTPUT_TOPIC": "json.solana.events5",
+        "KAFKA_OFFSET_RESET": "earliest",
+        "KAFKA_GROUP_ID": "solana-event-transformer-7"
+      }
+    },
+    {
+      "type": "pwa-node",
+      "request": "launch",
+      "name": "Leaderboard Process",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "program": "${workspaceFolder}/src/leaderboard/index.ts",
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": [
+        "${workspaceFolder}/dist/lib/**/*.js"
+      ],
+      "env": {
+        "KAFKA_BOOTSTRAP_SERVER": "localhost:29092",
+        "KAFKA_INPUT_TOPIC": "json.solana.events5",
+        "KAFKA_OFFSET_RESET": "earliest",
+        "KAFKA_GROUP_ID": "leaderboard3",
+        "REDIS_HOST": "localhost",
+        "REDIS_PORT": "6379"
+      }
+    }
+  ]
+}
