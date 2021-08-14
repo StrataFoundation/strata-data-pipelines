@@ -98,7 +98,7 @@ async function processSlot(slot: number) {
       };
     }
   } catch (e) {
-    if (e.message.includes(`Slot ${slot} was skipped`)) {
+    if (e.message && e.message.includes(`Slot ${slot} was skipped`)) {
       console.log(`Slot ${slot} was skipped or missing`)
       outputMsg = {
         key: slot.toString(),

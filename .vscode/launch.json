@@ -7,7 +7,7 @@
     {
       "type": "pwa-node",
       "request": "launch",
-      "name": "Launch Program",
+      "name": "Process Blocks",
       "skipFiles": [
         "<node_internals>/**"
       ],
@@ -22,7 +22,7 @@
         "S3_SECRET_ACCESS_KEY": "minioadmin",
         "S3_PREFIX": "blocks",
         "S3_BUCKET": "wumbo-solana-blocks",
-        "KAFKA_BOOTSTRAP_SERVER": "localhost:29092",
+        "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
         "KAFKA_TOPIC": "json.solana.blocks",
         // "ACCOUNTS": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
         "ACCOUNTS": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,4K8fnycnTESeyad4DqfXPF8TbkuyscPK4EjAwY35emyW,AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
@@ -31,7 +31,7 @@
     {
       "type": "pwa-node",
       "request": "launch",
-      "name": "Token Process",
+      "name": "Event Transform",
       "skipFiles": [
         "<node_internals>/**"
       ],
@@ -46,11 +46,13 @@
         "S3_SECRET_ACCESS_KEY": "minioadmin",
         "S3_PREFIX": "blocks",
         "S3_BUCKET": "wumbo-solana-blocks",
-        "KAFKA_BOOTSTRAP_SERVER": "localhost:29092",
+        "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
         "KAFKA_INPUT_TOPIC": "json.solana.blocks",
         "KAFKA_OUTPUT_TOPIC": "json.solana.events5",
         "KAFKA_OFFSET_RESET": "earliest",
-        "KAFKA_GROUP_ID": "solana-event-transformer-7"
+        "KAFKA_GROUP_ID": "solana-event-transformer-7",
+        "TOKEN_BONDING_PROGRAM_ID": "4K8fnycnTESeyad4DqfXPF8TbkuyscPK4EjAwY35emyW",
+        "WUMBO_PROGRAM_ID": "AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
       }
     },
     {
@@ -66,7 +68,7 @@
         "${workspaceFolder}/dist/lib/**/*.js"
       ],
       "env": {
-        "KAFKA_BOOTSTRAP_SERVER": "localhost:29092",
+        "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
         "KAFKA_INPUT_TOPIC": "json.solana.events5",
         "KAFKA_OFFSET_RESET": "earliest",
         "KAFKA_GROUP_ID": "leaderboard3",

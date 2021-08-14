@@ -1,7 +1,7 @@
-import { WUMBO_INSTRUCTION_SCHEMA, InitializeSocialTokenV0Args, InitializeWumboV0Args } from "spl-wumbo";
+import { WUMBO_INSTRUCTION_SCHEMA, InitializeSocialTokenV0Args, InitializeWumboV0Args } from "@wum.bo/spl-wumbo";
 
 export default {
-  programId: 'AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw',
+  programId: process.env["WUMBO_PROGRAM_ID"]!,
   schema: WUMBO_INSTRUCTION_SCHEMA,
   commands: [{
     name: "InitializeWumboV0",

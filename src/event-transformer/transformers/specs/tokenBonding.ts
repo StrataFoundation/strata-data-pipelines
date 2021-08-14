@@ -1,7 +1,7 @@
-import { TOKEN_BONDING_INSTRUCTION_SCHEMA, InitializeTokenBondingV0Args, BuyV0Args, SellV0Args } from "spl-token-bonding";
+import { TOKEN_BONDING_INSTRUCTION_SCHEMA, InitializeTokenBondingV0Args, BuyV0Args, SellV0Args } from "@wum.bo/spl-token-bonding";
 
 export default {
-  programId: '4K8fnycnTESeyad4DqfXPF8TbkuyscPK4EjAwY35emyW',
+  programId: process.env["TOKEN_BONDING_PROGRAM_ID"]!,
   schema: TOKEN_BONDING_INSTRUCTION_SCHEMA,
   commands: [{
     name: "InitializeTokenBondingV0",
