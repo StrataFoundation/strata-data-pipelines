@@ -1,8 +1,72 @@
 import { kafka } from "../setup/kafka";
 import { redisClient } from "../setup/redis";
 import { promisify } from "util";
+import { EachBatchPayload } from "kafkajs";
 
 const { KAFKA_GROUP_ID, KAFKA_INPUT_TOPIC } = process.env
+
+async function accountPlugin(payload: EachBatchPayload) {
+  const { batch: { messages } } = payload;
+  const batch = redisClient.batch()
+  const balanceChanges = messages
+    .map(m => ({ ...JSON.parse(m.value!.toString()), mint: m.key }))
+
+  // TODO: Ensure we aren't updating something updated in a more recent slot by another instance of this process.
+  // This was a start, but not working
+  // const slots = await promisify(redisClient.mget).bind(redisClient, "account-slots", balanceChanges.map(m => m.pubkey))()
+  // const relevantMessages = balanceChanges.filter((balanceChange, index) => {
+  //   return Number(slots[index]) < Number(balanceChange.slot)
+  // })
+  // await promisify(redisClient.mset).bind(redisClient, "account-slots", relevantMessages.flatMap(msg => [msg.pubkey, msg.slot.toString()]))()
+
+  const balanceMessagesByMint = balanceChanges
+    .reduce((acc, balanceChange) => {
+      if (!acc.get(balanceChange.mint)) acc.set(balanceChange.mint, [])
+      acc.get(balanceChange.mint)!.push(balanceChange)
+      return acc;
+    }, new Map())
+
+  Array.from(balanceMessagesByMint)
+    .forEach((keyAndValue: any) => {
+      const mint: string = keyAndValue[0];
+      const balanceChanges: any[] = keyAndValue[1];
+      const scoresAndValues = balanceChanges.flatMap((balanceChange: any) => {
+        return [Number(balanceChange.postAmount), balanceChange.pubkey]
+      })
+      // @ts-ignore
+      batch.zadd(`accounts-by-balance-${mint}`, 'CH', ...scoresAndValues)
+    });
+  const result = await promisify(batch.exec).bind(batch)();
+  const numChanged = result.reduce((a, b) => a + b, 0);
+  console.log(`Upserted ${numChanged} / ${messages.length} values`);
+}
+
+
+async function wumLockedPlugin(payload: EachBatchPayload) {
+  const { batch: { messages } } = payload;
+  const batch = redisClient.batch()
+  const wumLockedChanges = messages
+    .map(m => ({ ...JSON.parse(m.value!.toString()), pubkey: m.key.toString() }))
+
+  // TODO: Ensure we aren't updating something updated in a more recent slot by another instance of this process.
+  // This was a start, but not working
+  // const slots = await promisify(redisClient.mget).bind(redisClient, "wum-locked-slots", wumLockedChanges.map(m => m.pubkey))()
+  // const relevantMessages = wumLockedChanges.filter((balanceChange, index) => {
+  //   return Number(slots[index]) < balanceChange.slot
+  // })
+  // await promisify(redisClient.mset).bind(redisClient, "wum-locked-slots", relevantMessages.flatMap(msg => [msg.pubkey, msg.slot]))()
+  const toAdd = wumLockedChanges.flatMap(({ pubkey, wumLocked }) => [wumLocked, pubkey])
+  batch.zadd("wum-locked", 'CH', ...toAdd)
+
+  const result = await promisify(batch.exec).bind(batch)();
+  const numChanged = result.reduce((a, b) => a + b, 0);
+  console.log(`Upserted ${numChanged} / ${messages.length} values`);
+}
+
+const plugins = new Map([
+  ["ACCOUNT", accountPlugin],
+  ["WUM_LOCKED", wumLockedPlugin],
+])
 
 async function run() {
   const consumer = kafka.consumer({
@@ -17,32 +81,9 @@ async function run() {
 
   return new Promise((resolve, reject) => {
     consumer.run({
-      eachBatch: async ({ batch: { messages, offsetLag } }) => {
+      eachBatch: async (args) => {
         try {
-          const batch = redisClient.batch()
-          const relevantMessages = messages
-            .map(m => JSON.parse(m.value!.toString()))
-            .filter(m => m.type === "TokenAccountBalanceChange");
-          const balanceMessagesByMint = relevantMessages
-            .reduce((acc, balanceChange) => {
-              if (!acc.get(balanceChange.mint)) acc.set(balanceChange.mint, [])
-              acc.get(balanceChange.mint)!.push(balanceChange)
-              return acc;
-            }, new Map())
-
-          Array.from(balanceMessagesByMint)
-            .forEach((keyAndValue: any) => {
-              const mint: string = keyAndValue[0];
-              const balanceChanges: any[] = keyAndValue[1];
-              const scoresAndValues = balanceChanges.flatMap((balanceChange: any) => {
-                return [Number(balanceChange.postAmount), balanceChange.pubkey]
-              })
-              // @ts-ignore
-              batch.zadd(`accounts-by-balance-${mint}`, 'CH', ...scoresAndValues)
-            });
-          const result = await promisify(batch.exec).bind(batch)();
-          const numChanged = result.reduce((a, b) => a + b, 0);
-          console.log(`Upserted ${numChanged} / ${messages.length} values`);
+          await plugins.get(process.env["PLUGIN"] || "ACCOUNT")!(args)
         } catch(e) {
           reject(e)
           throw e;

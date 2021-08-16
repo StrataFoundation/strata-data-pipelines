@@ -24,6 +24,15 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_NUM_PARTITIONS: 1
+  kowl:
+    image: quay.io/cloudhut/kowl:master
+    ports:
+      - 8080:8080
+    depends_on: 
+      - kafka
+    environment: 
+      KAFKA_BROKERS: kafka:9092
+    restart: always
   minio:
     image: minio/minio:latest
     command: "server /data --console-address \":9001\""
@@ -38,3 +47,34 @@ services:
     image: redis:latest
     ports:
       - 6379:6379
+
+  rediscommander:
+    image: rediscommander/redis-commander:latest
+    ports:
+      - 8081:8081
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+  ksqldb-server:
+    image: confluentinc/ksqldb-server:0.19.0
+    hostname: ksqldb-server
+    container_name: ksqldb-server
+    depends_on:
+      - kafka
+    ports:
+      - "8088:8088"
+    environment:
+      KSQL_LISTENERS: http://0.0.0.0:8088
+      KSQL_BOOTSTRAP_SERVERS: kafka:9092
+      KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE: "true"
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: "true"
+
+  ksqldb-cli:
+    image: confluentinc/ksqldb-cli:0.19.0
+    container_name: ksqldb-cli
+    depends_on:
+      - kafka
+      - ksqldb-server
+    entrypoint: /bin/sh
+    tty: true

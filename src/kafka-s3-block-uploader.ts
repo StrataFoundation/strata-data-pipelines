@@ -129,6 +129,8 @@ async function getKafkaSlot(): Promise<number | null> {
     topic: KAFKA_TOPIC!,
     fromBeginning: false
   });
+  const admin = kafka.admin();
+  await admin.connect();
   
   let maxSlot: number | null = null
   consumer.run({
@@ -143,9 +145,21 @@ async function getKafkaSlot(): Promise<number | null> {
     }
   })
 
+  const offsets = await admin.fetchTopicOffsets(KAFKA_TOPIC!)
+  await Promise.all(
+    offsets.map(async offset => {
+      await consumer.seek({
+        topic: KAFKA_TOPIC!,
+        partition: offset.partition,
+        offset: (Number(offset.high) - 1).toString()
+      })
+    })
+  );
+
   return new Promise((resolve, reject) => {
     setTimeout(async () => {
       try {
+        await admin.disconnect();
         await consumer.disconnect()
       } catch (e) {
         reject(e)
@@ -176,7 +190,7 @@ async function run() {
     if (currentSlot > maxSlot) {
       console.log("Caught up, fetching current slot")
       maxSlot = await connection.getSlot(FINALITY)
-      await sleep(300) // Approx slot time
+      await sleep(1000) // If you set this too low, get too many requests
     }
   }
 }

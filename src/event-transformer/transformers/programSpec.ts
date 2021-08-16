@@ -7,11 +7,11 @@ export type Command = {
   index: number,
   name: string;
   accounts: string[];
-  args: any
+  args?: any
 }
 export type Spec = {
   programId: string,
-  schema: Map<any, any>,
+  schema?: Map<any, any>,
   commands: Command[]
 }
 
@@ -52,7 +52,7 @@ export default class ProgramSpecTransformer implements Transformer {
   get programIdToSchema(): Map<string, Map<any, any>> {
     const pids = new Map<string, Map<any, any>>();
     this.specs.forEach((spec: Spec) => {
-      pids.set(spec.programId, spec.schema);
+      spec.schema && pids.set(spec.programId, spec.schema);
     })
 
     return pids;
@@ -60,24 +60,26 @@ export default class ProgramSpecTransformer implements Transformer {
 
   transform(accountKeys: PublicKey[], transaction: BlockTransaction): any[] {
     return transaction.transaction.message.instructions
-      .filter(instruction => this.relevantKeys.has(accountKeys[instruction.programIdIndex].toBase58()))
-      .map(instruction => {
-        const index = new BinaryReader(baseDecode(instruction.data)).readU8();
+      .map((instruction, index) => ({ instruction, instructionIndex: index }))
+      .filter(({ instruction }) => this.relevantKeys.has(accountKeys[instruction.programIdIndex].toBase58()))
+      .map(({ instruction, instructionIndex }) => {
+        const index = instruction.data.length == 0 ? 0 : new BinaryReader(baseDecode(instruction.data)).readU8();
         const programId = accountKeys[instruction.programIdIndex].toBase58()
         const command = this.programIdAndIndexToCommand.get(programId)?.get(index)
         const schema = this.programIdToSchema.get(programId);
-        if (command && schema) {
+        if (command) {
           const accounts = instruction.accounts.reduce((acc, account, index) => {
             acc.set(command.accounts[index], accountKeys[account].toBase58());
 
             return acc;
           }, new Map<any, any>());
 
-          const args = deserializeUnchecked(schema, command.args, baseDecode(instruction.data));
+          const args = command.args && schema && deserializeUnchecked(schema, command.args, baseDecode(instruction.data));
           return {
             type: command.name,
+            instructionIndex,
             ...Object.fromEntries(accounts),
-            ...transformBN(args)
+            ...(command.args && Object.fromEntries(transformBN(args)))
           }
         }
 

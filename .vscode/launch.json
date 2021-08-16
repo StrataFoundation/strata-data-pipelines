@@ -25,7 +25,7 @@
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
         "KAFKA_TOPIC": "json.solana.blocks",
         // "ACCOUNTS": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
-        "ACCOUNTS": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,4K8fnycnTESeyad4DqfXPF8TbkuyscPK4EjAwY35emyW,AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
+        "ACCOUNTS": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL,TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,4K8fnycnTESeyad4DqfXPF8TbkuyscPK4EjAwY35emyW,AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
       }
     },
     {
@@ -48,9 +48,9 @@
         "S3_BUCKET": "wumbo-solana-blocks",
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
         "KAFKA_INPUT_TOPIC": "json.solana.blocks",
-        "KAFKA_OUTPUT_TOPIC": "json.solana.events5",
+        "KAFKA_OUTPUT_TOPIC": "json.solana.events",
         "KAFKA_OFFSET_RESET": "earliest",
-        "KAFKA_GROUP_ID": "solana-event-transformer-7",
+        "KAFKA_GROUP_ID": "solana-event-transformer",
         "TOKEN_BONDING_PROGRAM_ID": "4K8fnycnTESeyad4DqfXPF8TbkuyscPK4EjAwY35emyW",
         "WUMBO_PROGRAM_ID": "AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
       }
@@ -69,9 +69,31 @@
       ],
       "env": {
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
-        "KAFKA_INPUT_TOPIC": "json.solana.events5",
+        "KAFKA_INPUT_TOPIC": "json.solana.bonding_token_account_balance_changes",
         "KAFKA_OFFSET_RESET": "earliest",
-        "KAFKA_GROUP_ID": "leaderboard3",
+        "KAFKA_GROUP_ID": "account-leaderboard",
+        "REDIS_HOST": "localhost",
+        "REDIS_PORT": "6379"
+      }
+    },
+    {
+      "type": "pwa-node",
+      "request": "launch",
+      "name": "WUM Leaderboard Process",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "program": "${workspaceFolder}/src/leaderboard/index.ts",
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": [
+        "${workspaceFolder}/dist/lib/**/*.js"
+      ],
+      "env": {
+        "PLUGIN": "WUM_LOCKED",
+        "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
+        "KAFKA_INPUT_TOPIC": "json.solana.total_wum_locked",
+        "KAFKA_OFFSET_RESET": "earliest",
+        "KAFKA_GROUP_ID": "wum-locked-leaderboard3",
         "REDIS_HOST": "localhost",
         "REDIS_PORT": "6379"
       }

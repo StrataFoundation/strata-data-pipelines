@@ -1,13 +1,15 @@
 import { kafka } from "../setup/kafka";
 import { s3 } from "../setup/s3";
 import { TokenBalance, Message, BlockResponse, ConfirmedTransactionMeta, PublicKey, Transaction } from "@solana/web3.js";
-import { Message as KafkaMessage } from "kafkajs";
+import { Message as KafkaMessage, Producer, ProducerBatch, TopicMessages } from "kafkajs";
 import { BlockTransaction, Transformer } from "./transformers/Transformer";
 import TokenAccountTransformer from "./transformers/tokenAccounts";
 import BN from "bn.js";
 import "../utils/borshWithPubkeys";
 import wumboSpec from "./transformers/specs/wumbo";
 import tokenBondingSpec from "./transformers/specs/tokenBonding";
+import tokenSpec from "./transformers/specs/token";
+import associatedTokenSpec from "./transformers/specs/associatedToken";
 import ProgramSpecTransformer from "./transformers/programSpec";
 
 const { KAFKA_GROUP_ID, KAFKA_INPUT_TOPIC, KAFKA_OUTPUT_TOPIC } = process.env
@@ -24,7 +26,7 @@ function hasIntersect(set1: Set<any>, set2: Set<any>): boolean {
 
 const transformers: Transformer[] = [
   new TokenAccountTransformer(), 
-  new ProgramSpecTransformer(wumboSpec, tokenBondingSpec)
+  new ProgramSpecTransformer(associatedTokenSpec, tokenSpec, wumboSpec, tokenBondingSpec)
 ];
 function processTxn(block: BlockResponse & { slot: number }, txn: BlockTransaction): KafkaMessage[] {
   const accounts = txn.transaction.message.accountKeys.map((key) => (
@@ -36,16 +38,53 @@ function processTxn(block: BlockResponse & { slot: number }, txn: BlockTransacti
   return transformers
     .filter((t) => hasIntersect(accountsSet, t.relevantKeys))
     .flatMap(t => t.transform(accounts, txn))
-    .map((item : any) => ({
-      ...item,
-      slot: block.slot,
-      blockTime: block.blockTime,
-      blockhash: block.blockhash
-    }))
+    .map((item: any) => {
+      const { type, ...payload } = item;
+      return {
+        type,
+        payload,
+        slot: block.slot,
+        recentBlockhash: txn.transaction.message.recentBlockhash,
+        blockTime: block.blockTime,
+        blockhash: block.blockhash
+      }
+    })
     .map((item: any) => ({
       key: block.slot.toString(),
       value: JSON.stringify(item)
     }))
+}
+
+function sliceIntoChunks<A>(arr: A[], chunkSize: number): A[][] {
+  const res = [];
+  for (let i = 0; i < arr.length; i += chunkSize) {
+      const chunk = arr.slice(i, i + chunkSize);
+      res.push(chunk);
+  }
+  return res;
+}
+
+type PromFunc<A> = () => Promise<A>;
+async function linearPromiseAll<A>(funcs: PromFunc<A>[]): Promise<A[]> {
+  const results = [];
+  for(let func of funcs) {
+    results.push(await func());
+  }
+
+  return results;
+}
+
+// Need to break into smaller batches since js client doesn't have advanced linger.ms features.
+// So it'll just naively send way too large of a message and kafka will choke.
+async function publishFixedBatches(producer: Producer, batch: TopicMessages, maxSize: number = 1000) {
+  return linearPromiseAll(sliceIntoChunks(batch.messages || [], 1000).map(chunk => () =>
+    producer.sendBatch({
+      topicMessages: [{
+        ...batch,
+        messages: chunk
+      }]
+    })
+  ))
 }
 
 async function run() {
@@ -82,12 +121,10 @@ async function run() {
               })
           )).flat()
           console.log(`Sending batch of ${results.length} events`)
-          await producer.sendBatch({
-            topicMessages: [{
-              topic: KAFKA_OUTPUT_TOPIC!,
-              messages: results
-            }]
-          })
+          await publishFixedBatches(producer, {
+            topic: KAFKA_OUTPUT_TOPIC!,
+            messages: results
+          });
         } catch (e) {
           reject(e);
           throw e;
