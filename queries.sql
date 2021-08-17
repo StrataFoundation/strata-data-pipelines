@@ -27,7 +27,7 @@ AS SELECT
   solana_events."type" as "type", 
   solana_events."slot" as "slot", 
   solana_events."blockhash" as "blockhash",
-  solana_events."blockTime" as "blocktime",
+  solana_events."blockTime" as "blockTime",
   solana_events."recentBlockhash" as "recentBlockhash",
   EXTRACTJSONFIELD("payload", '$.instructionIndex') AS "instructionIndex",
   EXTRACTJSONFIELD("payload", '$.pubkey') AS "pubkey",
@@ -141,58 +141,133 @@ AS SELECT
   token_bonding_supply."tokenBonding" AS "tokenBonding",
   token_bonding_supply."blockTime" AS "blockTime",
   token_bonding_supply."instructionIndex" AS "instructionIndex",
-  "c" * LN(1 + ("g" * "supply")) as "price"
+  CAST("c" * LN(1 + ("g" * "supply")) AS DECIMAL(46, 12)) AS "price"
 FROM token_bonding_supply
 INNER JOIN curves ON token_bonding_supply."curve" = curves."curve"
 EMIT CHANGES;
 
-CREATE OR REPLACE STREAM wum_locked_by_account ("pubkey" VARCHAR KEY, "owner" VARCHAR, "wumLocked" DECIMAL(27, 9))
+CREATE OR REPLACE STREAM wum_locked_by_account ("account" VARCHAR KEY, "owner" VARCHAR, "tokenAmount" DECIMAL(27, 9), "wumLocked" DECIMAL(27, 9), "mint" VARCHAR, "blockTime" BIGINT)
     WITH (kafka_topic='json.solana.wum_locked_by_account', partitions=1, value_format='json');
 
 INSERT INTO wum_locked_by_account
 SELECT
-  bonding_token_account_balance_changes."pubkey" as "pubkey",
+  bonding_token_account_balance_changes."pubkey" as "account",
   accounts."owner" as "owner",
-  (
-    CAST(
+  CAST(
+    CONCAT(
+      SUBSTRING(LPAD("postAmount", 27, '0'), 1, 27 - "decimals"), 
+      '.', 
+      SUBSTRING(LPAD("postAmount", 27, '0'), 27 - "decimals" + 1, "decimals")
+    ) AS DECIMAL(27, 9)
+  ) AS "tokenAmount",
+  CASE WHEN "price" IS NULL THEN
+    NULL
+  ELSE
+    (
       CAST(
-        CONCAT(
-          SUBSTRING(LPAD("postAmount", 27, '0'), 1, 27 - "decimals"), 
-          '.', 
-          SUBSTRING(LPAD("postAmount", 27, '0'), 27 - "decimals" + 1, "decimals")
-        ) AS DECIMAL(27, 9)
-      ) * "price" AS DECIMAL(27, 9)
+        CAST(
+          CONCAT(
+            SUBSTRING(LPAD("postAmount", 27, '0'), 1, 27 - "decimals"), 
+            '.', 
+            SUBSTRING(LPAD("postAmount", 27, '0'), 27 - "decimals" + 1, "decimals")
+          ) AS DECIMAL(27, 9)
+        ) * "price" AS DECIMAL(27, 9)
+      )
     )
-  ) AS "wumLocked"
+  END AS "wumLocked",
+  bonding_token_account_balance_changes."mint" as "mint",
+  bonding_token_account_balance_changes."blockTime" as "blockTime"
 FROM bonding_token_account_balance_changes
-JOIN token_bonding_prices ON token_bonding_prices."targetMint" = bonding_token_account_balance_changes."mint"
-JOIN accounts ON accounts."account" = bonding_token_account_balance_changes."pubkey"
-WHERE "baseMint" = '1czp9ednjLjgLuqMYNdcKM9m9xEYF3PSk4nCH8ihkT9';
+LEFT OUTER JOIN token_bonding_prices ON token_bonding_prices."targetMint" = bonding_token_account_balance_changes."mint"
+LEFT OUTER JOIN accounts ON accounts."account" = bonding_token_account_balance_changes."pubkey"
+WHERE "baseMint" IS NULL OR "baseMint" = 'EN75YBRFCoSezbkvRfbEqvsRU4mgXaDQjG7fkAtYjN9z';
 
 INSERT INTO wum_locked_by_account
 SELECT
-  bonding_token_account_balance_changes."pubkey",
+  bonding_token_account_balance_changes."pubkey" as "account",
   accounts."owner" as "owner",
   CAST(
-        CONCAT(
-          SUBSTRING(LPAD("postAmount", 27, '0'), 1, 27 - "decimals"), 
-          '.', 
-          SUBSTRING(LPAD("postAmount", 27, '0'), 27 - "decimals" + 1, "decimals")
-        ) AS DECIMAL(27, 9)
-      ) AS "wumLocked"
+    CONCAT(
+      SUBSTRING(LPAD("postAmount", 27, '0'), 1, 27 - "decimals"), 
+      '.', 
+      SUBSTRING(LPAD("postAmount", 27, '0'), 27 - "decimals" + 1, "decimals")
+    ) AS DECIMAL(27, 9)
+  ) AS "tokenAmount",
+  CAST(
+    CONCAT(
+      SUBSTRING(LPAD("postAmount", 27, '0'), 1, 27 - "decimals"), 
+      '.', 
+      SUBSTRING(LPAD("postAmount", 27, '0'), 27 - "decimals" + 1, "decimals")
+    ) AS DECIMAL(27, 9)
+  ) AS "wumLocked",
+  bonding_token_account_balance_changes."mint" as "mint",
+  bonding_token_account_balance_changes."blockTime" as "blockTime"
 FROM bonding_token_account_balance_changes
-JOIN accounts ON accounts."account" = bonding_token_account_balance_changes."pubkey"
-WHERE bonding_token_account_balance_changes."mint" = '1czp9ednjLjgLuqMYNdcKM9m9xEYF3PSk4nCH8ihkT9';
+LEFT OUTER JOIN accounts ON accounts."account" = bonding_token_account_balance_changes."pubkey"
+WHERE bonding_token_account_balance_changes."mint" = 'EN75YBRFCoSezbkvRfbEqvsRU4mgXaDQjG7fkAtYjN9z';
+
+-- Because accounts can come out of order, append the account if it comes in later:
+CREATE STREAM accounts_stream(
+  "account" VARCHAR KEY,
+  "slot" BIGINT,
+  "blockhash" VARCHAR,
+  "recentBlockhash" VARCHAR,
+  "blockTime" BIGINT,
+  "instructionIndex" INT,
+  "mint" VARCHAR,
+  "owner" VARCHAR
+)
+  WITH(kafka_topic='json.solana.accounts', partitions=1, value_format='json');
+
+INSERT INTO wum_locked_by_account
+SELECT
+  wum_locked_by_account."account" as "account",
+  accounts_stream."owner" as "owner",
+  wum_locked_by_account."tokenAmount" as "tokenAmount",
+  "wumLocked",
+  wum_locked_by_account."mint" as "mint",
+  wum_locked_by_account."blockTime" as "blockTime"
+FROM accounts_stream
+JOIN wum_locked_by_account WITHIN 2 HOURS ON accounts_stream."account" = wum_locked_by_account."account" 
+WHERE wum_locked_by_account."owner" IS NULL;
+
+
+-- Because prices can come out of order, append the price if it comes in later:
+CREATE OR REPLACE STREAM token_bonding_prices_stream(
+  "targetMint" VARCHAR KEY,
+  "curve" VARCHAR,
+  "baseMint" VARCHAR,
+  "tokenBonding" VARCHAR,
+  "blockTime" BIGINT,
+  "price" DECIMAL(46, 12)
+)
+  WITH(kafka_topic='json.solana.token_bonding_prices', partitions=1, value_format='json');
+
+INSERT INTO wum_locked_by_account
+SELECT
+  wum_locked_by_account."account" as "account",
+  wum_locked_by_account."owner" as "owner",
+  wum_locked_by_account."tokenAmount" as "tokenAmount",
+  CAST(
+    wum_locked_by_account."tokenAmount" * token_bonding_prices_stream."price" AS DECIMAL(27, 9)
+  ) AS "wumLocked",
+  wum_locked_by_account."mint" as "mint",
+  wum_locked_by_account."blockTime" as "blockTime"
+FROM wum_locked_by_account
+JOIN token_bonding_prices_stream WITHIN 2 HOURS ON wum_locked_by_account."mint" = token_bonding_prices_stream."targetMint" 
+WHERE wum_locked_by_account."wumLocked" IS NULL
+PARTITION BY "account";
 
 CREATE TABLE wum_locked_by_account_table
     WITH (kafka_topic='json.solana.wum_locked_by_account_table', partitions=1, value_format='json')
 AS
 SELECT 
-  "pubkey",
+  "account",
   LATEST_BY_OFFSET("owner") AS "owner",
   CAST(LATEST_BY_OFFSET(CAST("wumLocked" AS VARCHAR)) AS DECIMAL(27, 9)) as "wumLocked"
 FROM wum_locked_by_account
-GROUP BY "pubkey"
+WHERE "owner" IS NOT NULL AND "wumLocked" IS NOT NULL
+GROUP BY "account"
 EMIT CHANGES;
 
 CREATE OR REPLACE TABLE total_wum_locked

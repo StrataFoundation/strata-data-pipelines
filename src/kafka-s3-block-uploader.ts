@@ -85,7 +85,8 @@ async function processSlot(slot: number) {
     
       outputMsg = {
         key: slot.toString(),
-        value: JSON.stringify(result)
+        value: JSON.stringify(result),
+        timestamp: ((block?.blockTime || 0) * 1000).toString()
       };
     } else {
       console.log(`No transactions in slot ${slot}`)
@@ -94,7 +95,8 @@ async function processSlot(slot: number) {
         value: JSON.stringify({
           slot,
           skipped: true
-        })
+        }),
+        timestamp: ((block?.blockTime || 0) * 1000).toString()
       };
     }
   } catch (e) {

@@ -51,7 +51,8 @@ function processTxn(block: BlockResponse & { slot: number }, txn: BlockTransacti
     })
     .map((item: any) => ({
       key: block.slot.toString(),
-      value: JSON.stringify(item)
+      value: JSON.stringify(item),
+      timestamp: ((block.blockTime || 0) * 1000).toString()
     }))
 }
 
