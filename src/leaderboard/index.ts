@@ -46,17 +46,31 @@ async function wumLockedPlugin(payload: EachBatchPayload) {
   const { batch: { messages } } = payload;
   const batch = redisClient.batch()
   const wumLockedChanges = messages
-    .map(m => ({ ...JSON.parse(m.value!.toString()), pubkey: m.key.toString() }))
+    .map(m => ({ ...JSON.parse(m.value!.toString()), account: m.key.toString() }))
 
   // TODO: Ensure we aren't updating something updated in a more recent slot by another instance of this process.
   // This was a start, but not working
-  // const slots = await promisify(redisClient.mget).bind(redisClient, "wum-locked-slots", wumLockedChanges.map(m => m.pubkey))()
+  // const slots = await promisify(redisClient.mget).bind(redisClient, "wum-locked-slots", wumLockedChanges.map(m => m.account))()
   // const relevantMessages = wumLockedChanges.filter((balanceChange, index) => {
   //   return Number(slots[index]) < balanceChange.slot
   // })
-  // await promisify(redisClient.mset).bind(redisClient, "wum-locked-slots", relevantMessages.flatMap(msg => [msg.pubkey, msg.slot]))()
-  const toAdd = wumLockedChanges.flatMap(({ pubkey, wumLocked }) => [wumLocked, pubkey])
+  // await promisify(redisClient.mset).bind(redisClient, "wum-locked-slots", relevantMessages.flatMap(msg => [msg.account, msg.slot]))()
+  const toAdd = wumLockedChanges.flatMap(({ account, wumLocked }) => [wumLocked, account])
   batch.zadd("wum-locked", 'CH', ...toAdd)
+
+  const result = await promisify(batch.exec).bind(batch)();
+  const numChanged = result.reduce((a, b) => a + b, 0);
+  console.log(`Upserted ${numChanged} / ${messages.length} values`);
+}
+
+async function topTokens(payload: EachBatchPayload) {
+  const { batch: { messages } } = payload;
+  const batch = redisClient.batch()
+  const tokenBalanceChanges = messages
+    .map(m => JSON.parse(m.value!.toString()))
+
+  const toAdd = tokenBalanceChanges.flatMap(({ tokenBonding, supply }) => [supply, tokenBonding])
+  batch.zadd("top-tokens", 'CH', ...toAdd)
 
   const result = await promisify(batch.exec).bind(batch)();
   const numChanged = result.reduce((a, b) => a + b, 0);
@@ -66,6 +80,7 @@ async function wumLockedPlugin(payload: EachBatchPayload) {
 const plugins = new Map([
   ["ACCOUNT", accountPlugin],
   ["WUM_LOCKED", wumLockedPlugin],
+  ["TOP_TOKENS", topTokens]
 ])
 
 async function run() {

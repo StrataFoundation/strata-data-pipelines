@@ -54,6 +54,7 @@ package "Kafka + KSQL" as k {
 agent KafkaS3BlockUploader
 agent AccountLeaderboard
 agent WumLockedLeaderboard
+agent TopTokensLeaderboard
 agent WumboAPI
 
 cloud Solana
@@ -73,6 +74,9 @@ EventTransformer -> events
 
 total_wum_locked -> WumLockedLeaderboard
 WumLockedLeaderboard -> Redis
+
+token_bonding_supply -> TopTokensLeaderboard
+TopTokensLeaderboard -> Redis
 
 bonding_token_account_balance_changes -> AccountLeaderboard
 AccountLeaderboard -> Redis
