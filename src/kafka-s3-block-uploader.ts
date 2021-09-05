@@ -12,7 +12,6 @@ const S3_PREFIX = process.env["S3_PREFIX"]!
 const ACCOUNTS = new Set(process.env["ACCOUNTS"]!.split(","))
 const { KAFKA_TOPIC } = process.env
 
-
 const producer = kafka.producer()
 
 /**
@@ -53,7 +52,7 @@ async function processSlot(slot: number) {
     const block = await connection.getBlock(slot, { commitment: FINALITY });
     const fileInfo = {
       Bucket: S3_BUCKET,
-      Key: `${S3_PREFIX}/${slot}.json.gz`,
+      Key: `${S3_PREFIX}/${slot.toString().padStart(16, '0')}.json.gz`,
     }
     const filteredBlock = {
       ...block,

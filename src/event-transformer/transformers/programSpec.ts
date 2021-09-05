@@ -1,7 +1,8 @@
-import { PublicKey, TokenBalance } from "@solana/web3.js";
+import { CompiledInstruction, PublicKey, TokenBalance } from "@solana/web3.js";
 import { BlockTransaction, Transformer } from "./Transformer";
 import { BinaryReader, deserializeUnchecked, baseDecode } from "borsh";
 import BN from "bn.js";
+import { InstructionTransformer } from "./InstructionTransformer";
 
 export type Command = {
   index: number,
@@ -28,10 +29,11 @@ function transformBN(args: any): Map<string, any> {
   }, new Map<string, any>());
 }
 
-export default class ProgramSpecTransformer implements Transformer {
+export default class ProgramSpecTransformer extends InstructionTransformer {
   specs: Spec[]
 
   constructor(...specs: Spec[]) {
+    super();
     this.specs = specs;
   }
 
@@ -58,33 +60,27 @@ export default class ProgramSpecTransformer implements Transformer {
     return pids;
   }
 
-  transform(accountKeys: PublicKey[], transaction: BlockTransaction): any[] {
-    return transaction.transaction.message.instructions
-      .map((instruction, index) => ({ instruction, instructionIndex: index }))
-      .filter(({ instruction }) => this.relevantKeys.has(accountKeys[instruction.programIdIndex].toBase58()))
-      .map(({ instruction, instructionIndex }) => {
-        const index = instruction.data.length == 0 ? 0 : new BinaryReader(baseDecode(instruction.data)).readU8();
-        const programId = accountKeys[instruction.programIdIndex].toBase58()
-        const command = this.programIdAndIndexToCommand.get(programId)?.get(index)
-        const schema = this.programIdToSchema.get(programId);
-        if (command) {
-          const accounts = instruction.accounts.reduce((acc, account, index) => {
-            acc.set(command.accounts[index], accountKeys[account].toBase58());
+  transformInstruction(accountKeys: PublicKey[], transaction: BlockTransaction, instruction: CompiledInstruction): any[] {
+    const index = instruction.data.length == 0 ? 0 : new BinaryReader(baseDecode(instruction.data)).readU8();
+    const programId = accountKeys[instruction.programIdIndex].toBase58()
+    const command = this.programIdAndIndexToCommand.get(programId)?.get(index)
+    const schema = this.programIdToSchema.get(programId);
+    if (command) {
+      const accounts = instruction.accounts.reduce((acc, account, index) => {
+        acc.set(command.accounts[index], accountKeys[account].toBase58());
 
-            return acc;
-          }, new Map<any, any>());
+        return acc;
+      }, new Map<any, any>());
 
-          const args = command.args && schema && deserializeUnchecked(schema, command.args, baseDecode(instruction.data));
-          return {
-            type: command.name,
-            instructionIndex,
-            ...Object.fromEntries(accounts),
-            ...(command.args && Object.fromEntries(transformBN(args)))
-          }
-        }
+      const args = command.args && schema && deserializeUnchecked(schema, command.args, baseDecode(instruction.data));
+      return [{
+        type: command.name,
+        programId,
+        accounts: Object.fromEntries(accounts),
+        data: (command.args && Object.fromEntries(transformBN(args)))
+      }]
+    }
 
-        return null;
-      })
-      .filter(Boolean)
+    return [];
   }
 }

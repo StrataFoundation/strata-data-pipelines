@@ -9,17 +9,24 @@ AS SELECT
   LATEST_BY_OFFSET("recentBlockhash") AS "recentBlockhash",
   LATEST_BY_OFFSET("blockTime") AS "blockTime",
   LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.instructionIndex')) AS "instructionIndex",
-  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.payer')) AS "payer",
-  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.tokenBonding')) AS "tokenBonding",
-  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.curve')) AS "curve",
-  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.baseMint')) AS "baseMint",
-  EXTRACTJSONFIELD("payload", '$.targetMint') AS "targetMint",
-  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.founderRewards')) AS "founderRewards",
-  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.baseStorage')) AS "baseStorage",
-  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.baseStorageAuthority')) AS "baseStorageAuthority"
+  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.innerIndex')) AS "innerIndex",
+  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.data.args.baseRoyaltyPercentage')) AS "baseRoyaltyPercentage",
+  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.data.args.targetRoyaltyPercentage')) AS "targetRoyaltyPercentage",
+  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.data.args.mintCap')) AS "mintCap",
+  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.data.args.tokenBondingAuthority')) AS "tokenBondingAuthority",
+  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.data.args.buyFrozen')) AS "buyFrozen",
+  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.accounts.payer')) AS "payer",
+  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.accounts.tokenBonding')) AS "tokenBonding",
+  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.accounts.curve')) AS "curve",
+  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.accounts.baseMint')) AS "baseMint",
+  EXTRACTJSONFIELD("payload", '$.accounts.targetMint') AS "targetMint",
+  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.accounts.baseRoyalties')) AS "baseRoyalties",
+  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.accounts.targetRoyalties')) AS "targetRoyalties",
+  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.accounts.baseStorage')) AS "baseStorage",
+  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.accounts.baseStorageAuthority')) AS "baseStorageAuthority"
 FROM solana_events
-WHERE "type" = 'InitializeTokenBondingV0'
-GROUP BY EXTRACTJSONFIELD("payload", '$.targetMint');
+WHERE "type" = 'initializeTokenBondingV0'
+GROUP BY EXTRACTJSONFIELD("payload", '$.accounts.targetMint');
 
 CREATE OR REPLACE STREAM bonding_token_account_balance_changes 
 WITH (kafka_topic='json.solana.bonding_token_account_balance_changes', value_format='json', partitions=1) 
@@ -30,6 +37,7 @@ AS SELECT
   solana_events."blockTime" as "blockTime",
   solana_events."recentBlockhash" as "recentBlockhash",
   EXTRACTJSONFIELD("payload", '$.instructionIndex') AS "instructionIndex",
+  EXTRACTJSONFIELD("payload", '$.innerIndex') AS "innerIndex",
   EXTRACTJSONFIELD("payload", '$.pubkey') AS "pubkey",
   token_bonding_initializes."targetMint" AS "mint",
   EXTRACTJSONFIELD("payload", '$.preAmount') AS "preAmount",
@@ -49,30 +57,31 @@ AS SELECT
   "recentBlockhash",
   "blockTime",
   EXTRACTJSONFIELD("payload", '$.instructionIndex') AS "instructionIndex",
-  EXTRACTJSONFIELD("payload", '$.tokenBonding') AS "tokenBonding",
-  EXTRACTJSONFIELD("payload", '$.curve') AS "curve",
-  EXTRACTJSONFIELD("payload", '$.baseMint') AS "baseMint",
-  EXTRACTJSONFIELD("payload", '$.targetMint') AS "targetMint",
-  CASE WHEN "type" = 'BuyTokenBondingV0' THEN 
+  EXTRACTJSONFIELD("payload", '$.innerIndex') AS "innerIndex",
+  EXTRACTJSONFIELD("payload", '$.accounts.tokenBonding') AS "tokenBonding",
+  EXTRACTJSONFIELD("payload", '$.accounts.curve') AS "curve",
+  EXTRACTJSONFIELD("payload", '$.accounts.baseMint') AS "baseMint",
+  EXTRACTJSONFIELD("payload", '$.accounts.targetMint') AS "targetMint",
+  CASE WHEN "type" = 'buyV0' THEN 
     CAST(
       CONCAT(
-        SUBSTRING(LPAD(EXTRACTJSONFIELD("payload", '$.amount'), 27, '0'), 1, 27 - 9), 
+        SUBSTRING(LPAD(EXTRACTJSONFIELD("payload", '$.data.args.targetAmount'), 27, '0'), 1, 27 - 9), 
         '.', 
-        SUBSTRING(LPAD(EXTRACTJSONFIELD("payload", '$.amount'), 27, '0'), 27 - 9 + 1, 9)
+        SUBSTRING(LPAD(EXTRACTJSONFIELD("payload", '$.data.args.targetAmount'), 27, '0'), 27 - 9 + 1, 9)
       )
       AS DECIMAL(27, 9)
     ) 
   ELSE
     - CAST(
       CONCAT(
-        SUBSTRING(LPAD(EXTRACTJSONFIELD("payload", '$.amount'), 27, '0'), 1, 27 - 9), 
+        SUBSTRING(LPAD(EXTRACTJSONFIELD("payload", '$.data.args.targetAmount'), 27, '0'), 1, 27 - 9), 
         '.', 
-        SUBSTRING(LPAD(EXTRACTJSONFIELD("payload", '$.amount'), 27, '0'), 27 - 9 + 1, 9)
+        SUBSTRING(LPAD(EXTRACTJSONFIELD("payload", '$.data.args.targetAmount'), 27, '0'), 27 - 9 + 1, 9)
       )
       AS DECIMAL(27, 9)
     ) 
   END AS "amount"
-FROM solana_events WHERE "type" = 'BuyTokenBondingV0' or "type" = 'SellTokenBondingV0' EMIT CHANGES;
+FROM solana_events WHERE "type" = 'buyV0' or "type" = 'sellV0' EMIT CHANGES;
 
 CREATE TABLE token_bonding_supply 
 WITH (kafka_topic='json.solana.token_bonding_supply', partitions=1, value_format='json')
@@ -83,39 +92,40 @@ AS SELECT
   LATEST_BY_OFFSET("tokenBonding") AS "tokenBonding", 
   LATEST_BY_OFFSET("blockTime") AS "blockTime",
   LATEST_BY_OFFSET("instructionIndex") AS "instructionIndex",
+  LATEST_BY_OFFSET("innerIndex") AS "innerIndex",
   SUM("amount") as "supply"
 FROM token_bonding_supply_changes
 GROUP BY "targetMint"
 EMIT CHANGES;
 
-CREATE OR REPLACE TABLE curves 
-WITH (kafka_topic='json.solana.curves', value_format='json', partitions=1) 
+CREATE OR REPLACE TABLE log_curves 
+WITH (kafka_topic='json.solana.log_curves', value_format='json', partitions=1) 
 AS SELECT
   LATEST_BY_OFFSET("slot") AS "slot",
   LATEST_BY_OFFSET("blockhash") AS "blockhash",
   LATEST_BY_OFFSET("recentBlockhash") AS "recentBlockhash",
   LATEST_BY_OFFSET("blockTime") AS "blockTime",
   LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.instructionIndex')) AS "instructionIndex",
-  EXTRACTJSONFIELD("payload", '$.curve') AS "curve",
-  CAST(LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.taylorIterations')) AS INT) AS "taylorIterations",
-  CAST(LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.isBaseRelative')) AS BOOLEAN) AS "isBaseRelative",
+  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.innerIndex')) AS "innerIndex",
+  EXTRACTJSONFIELD("payload", '$.accounts.curve') AS "curve",
+  CAST(LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.data.args.taylorIterations')) AS INT) AS "taylorIterations",
   CAST(
     CONCAT(
-      SUBSTRING(LATEST_BY_OFFSET(LPAD(EXTRACTJSONFIELD("payload", '$.g'), 46, '0')), 1, 46 - 12), 
+      SUBSTRING(LATEST_BY_OFFSET(LPAD(EXTRACTJSONFIELD("payload", '$.data.args.logCurveV0.g'), 46, '0')), 1, 46 - 12), 
       '.', 
-      SUBSTRING(LATEST_BY_OFFSET(LPAD(EXTRACTJSONFIELD("payload", '$.g'), 46, '0')), 46 - 12 + 1, 12)
+      SUBSTRING(LATEST_BY_OFFSET(LPAD(EXTRACTJSONFIELD("payload", '$.data.args.logCurveV0.g'), 46, '0')), 46 - 12 + 1, 12)
     ) AS DECIMAL(46, 12)
   ) AS "g",
   CAST(
     CONCAT(
-      SUBSTRING(LATEST_BY_OFFSET(LPAD(EXTRACTJSONFIELD("payload", '$.c'), 46, '0')), 1, 46 - 12),
+      SUBSTRING(LATEST_BY_OFFSET(LPAD(EXTRACTJSONFIELD("payload", '$.data.args.logCurveV0.c'), 46, '0')), 1, 46 - 12),
       '.',
-      SUBSTRING(LATEST_BY_OFFSET(LPAD(EXTRACTJSONFIELD("payload", '$.c'), 46, '0')), 46 - 12 + 1, 12)
+      SUBSTRING(LATEST_BY_OFFSET(LPAD(EXTRACTJSONFIELD("payload", '$.data.args.logCurveV0.c'), 46, '0')), 46 - 12 + 1, 12)
     ) AS DECIMAL(46, 12)
   ) AS "c"
 FROM solana_events
-WHERE "type" = 'CreateLogCurveV0'
-GROUP BY EXTRACTJSONFIELD("payload", '$.curve');
+WHERE "type" = 'createCurveV0' AND EXTRACTJSONFIELD("payload", '$.data.args.logCurveV0') IS NOT NULL
+GROUP BY EXTRACTJSONFIELD("payload", '$.accounts.curve');
 
 CREATE OR REPLACE TABLE accounts 
 WITH (kafka_topic='json.solana.accounts', value_format='json', partitions=1) 
@@ -125,6 +135,7 @@ AS SELECT
   LATEST_BY_OFFSET("recentBlockhash") AS "recentBlockhash",
   LATEST_BY_OFFSET("blockTime") AS "blockTime",
   LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.instructionIndex')) AS "instructionIndex",
+  LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.innerIndex')) AS "innerIndex",
   EXTRACTJSONFIELD("payload", '$.account') AS "account",
   LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.mint')) AS "mint",
   LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.owner')) AS "owner"
@@ -141,9 +152,10 @@ AS SELECT
   token_bonding_supply."tokenBonding" AS "tokenBonding",
   token_bonding_supply."blockTime" AS "blockTime",
   token_bonding_supply."instructionIndex" AS "instructionIndex",
+  token_bonding_supply."innerIndex" AS "innerIndex",
   CAST("c" * LN(1 + ("g" * "supply")) AS DECIMAL(46, 12)) AS "price"
 FROM token_bonding_supply
-INNER JOIN curves ON token_bonding_supply."curve" = curves."curve"
+INNER JOIN log_curves ON token_bonding_supply."curve" = log_curves."curve"
 EMIT CHANGES;
 
 CREATE OR REPLACE STREAM wum_locked_by_account ("account" VARCHAR KEY, "owner" VARCHAR, "tokenAmount" DECIMAL(27, 9), "wumLocked" DECIMAL(27, 9), "mint" VARCHAR, "blockTime" BIGINT)
@@ -214,6 +226,7 @@ CREATE STREAM accounts_stream(
   "recentBlockhash" VARCHAR,
   "blockTime" BIGINT,
   "instructionIndex" INT,
+  "innerIndex" INT,
   "mint" VARCHAR,
   "owner" VARCHAR
 )

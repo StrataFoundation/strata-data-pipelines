@@ -5,6 +5,24 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "args": [
+        "-u",
+        "bdd",
+        "--timeout",
+        "999999",
+        "--colors",
+        "${workspaceFolder}/tests/**/*.ts"
+      ],
+      "internalConsoleOptions": "openOnSessionStart",
+      "name": "Mocha Tests",
+      "program": "${workspaceFolder}/node_modules/ts-mocha/bin/ts-mocha",
+      "request": "launch",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "type": "pwa-node"
+    },
+    {
       "type": "pwa-node",
       "request": "launch",
       "name": "Process Blocks",
@@ -24,6 +42,7 @@
         "S3_BUCKET": "wumbo-solana-blocks",
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
         "KAFKA_TOPIC": "json.solana.blocks",
+        "ANCHOR_IDLS": "",
         // "ACCOUNTS": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
         "ACCOUNTS": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL,TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,4K8fnycnTESeyad4DqfXPF8TbkuyscPK4EjAwY35emyW,AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
       }
@@ -41,6 +60,8 @@
         "${workspaceFolder}/dist/lib/**/*.js"
       ],
       "env": {
+        "ANCHOR_IDLS": "B97SZXJBRUBHTZiaKB4PwUwzx4N8vkqWV6beAdhiMqqg,BFrD2YQKd8Fz4eeQrUsM8GEFw8UKR4oLWq4xHL6WJNtG",
+        "SOLANA_URL": "http://127.0.0.1:8899",
         "S3_ENDPOINT": "http://localhost:9000",
         "S3_ACCESS_KEY_ID": "minioadmin",
         "S3_SECRET_ACCESS_KEY": "minioadmin",
@@ -96,6 +117,30 @@
         "KAFKA_GROUP_ID": "wum-locked-leaderboard3",
         "REDIS_HOST": "localhost",
         "REDIS_PORT": "6379"
+      }
+    },
+    {
+      "type": "pwa-node",
+      "request": "launch",
+      "name": "Process Blocks Local",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "program": "${workspaceFolder}/src/kafka-s3-block-uploader.ts",
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": [
+        "${workspaceFolder}/dist/lib/**/*.js"
+      ],
+      "env": {
+        "SOLANA_URL": "http://127.0.0.1:8899",
+        "S3_ENDPOINT": "http://localhost:9000",
+        "S3_ACCESS_KEY_ID": "minioadmin",
+        "S3_SECRET_ACCESS_KEY": "minioadmin",
+        "S3_PREFIX": "blocks",
+        "S3_BUCKET": "wumbo-solana-blocks",
+        "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
+        "KAFKA_TOPIC": "json.solana.blocks",
+        "ACCOUNTS": "B97SZXJBRUBHTZiaKB4PwUwzx4N8vkqWV6beAdhiMqqg,BFrD2YQKd8Fz4eeQrUsM8GEFw8UKR4oLWq4xHL6WJNtG"
       }
     }
   ]
