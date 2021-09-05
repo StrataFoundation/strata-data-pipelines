@@ -1,0 +1,87 @@
+@startuml architecture
+
+package "Kafka + KSQL" as k {
+  queue accounts #fff
+  queue blocks
+  queue bonding_token_account_balance_changes
+  queue token_bonding_initializes #fff
+  queue curves #fff
+  queue events
+  queue token_bonding_prices #fff
+  queue token_bonding_supply #fff
+  queue token_bonding_supply_changes
+  queue total_wum_locked #fff
+  queue wum_locked_by_account
+  queue wum_locked_by_account_table #fff
+
+    
+  events --> token_bonding_initializes
+
+  events --> bonding_token_account_balance_changes
+  token_bonding_initializes --> bonding_token_account_balance_changes
+
+  events --> token_bonding_supply_changes
+
+  token_bonding_supply_changes --> token_bonding_supply
+
+  events --> curves
+
+  events --> accounts
+
+  token_bonding_supply --> token_bonding_prices
+  curves --> token_bonding_prices
+
+  bonding_token_account_balance_changes --> wum_locked_by_account
+  token_bonding_prices --> wum_locked_by_account
+  accounts --> wum_locked_by_account
+
+  agent "INSERT missed_owners" as missed_owners
+  agent "INSERT missed_prices" as missed_prices
+
+  token_bonding_prices -> missed_prices
+  accounts -> missed_owners
+  wum_locked_by_account -> missed_owners
+  wum_locked_by_account -> missed_prices
+
+  missed_owners -> wum_locked_by_account
+  missed_prices -> wum_locked_by_account
+
+  wum_locked_by_account_table --> total_wum_locked
+
+  wum_locked_by_account --> wum_locked_by_account_table : owner not null, wumLocked not null
+}
+
+agent KafkaS3BlockUploader
+agent AccountLeaderboard
+agent WumLockedLeaderboard
+agent TopTokensLeaderboard
+agent WumboAPI
+
+cloud Solana
+cloud S3
+database Redis
+person UI
+
+Solana -> KafkaS3BlockUploader
+KafkaS3BlockUploader -> blocks
+KafkaS3BlockUploader -> S3
+
+agent EventTransformer
+
+S3 -> EventTransformer
+blocks --> EventTransformer
+EventTransformer -> events
+
+total_wum_locked -> WumLockedLeaderboard
+WumLockedLeaderboard -> Redis
+
+token_bonding_supply -> TopTokensLeaderboard
+TopTokensLeaderboard -> Redis
+
+bonding_token_account_balance_changes -> AccountLeaderboard
+AccountLeaderboard -> Redis
+
+Redis -> WumboAPI
+
+WumboAPI -> UI
+@enduml

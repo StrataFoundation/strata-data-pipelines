@@ -1,0 +1,26 @@
+{
+  "name": "kafka-s3-block-uploader",
+  "version": "0.0.1",
+  "private": true,
+  "homepage": "https://wum.bo/",
+  "scripts": {
+    "run": "ts-node src/event-transformer/index.ts",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@types/redis": "^2.8.31",
+    "ts-node": "^10.1.0",
+    "typescript": "^4.3.5"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.22.0",
+    "@types/uuid": "^8.3.1",
+    "@wum.bo/spl-token-bonding": "^1.0.0",
+    "@wum.bo/spl-wumbo": "^1.0.0",
+    "aws-sdk": "^2.961.0",
+    "borsh": "^0.4.0",
+    "kafkajs": "^1.15.0",
+    "redis": "^3.1.2",
+    "uuid": "^8.3.2"
+  }
+}
