@@ -142,6 +142,25 @@
         "KAFKA_TOPIC": "json.solana.blocks",
         "ACCOUNTS": "B97SZXJBRUBHTZiaKB4PwUwzx4N8vkqWV6beAdhiMqqg,BFrD2YQKd8Fz4eeQrUsM8GEFw8UKR4oLWq4xHL6WJNtG"
       }
+    }, {
+      "type": "pwa-node",
+      "request": "launch",
+      "name": "Trophy Process",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "program": "${workspaceFolder}/src/trophies/index.ts",
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": [
+        "${workspaceFolder}/dist/lib/**/*.js"
+      ],
+      "env": {
+        "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
+        "KAFKA_INPUT_TOPIC": "json.solana.trophies",
+        "KAFKA_OFFSET_RESET": "earliest",
+        "KAFKA_GROUP_ID": "trophies4",
+        "SERVICE_ACCOUNT": "[]"
+      }
     }
   ]
 }
