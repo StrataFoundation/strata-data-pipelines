@@ -67,7 +67,10 @@ export default class ProgramSpecTransformer extends InstructionTransformer {
     const schema = this.programIdToSchema.get(programId);
     if (command) {
       const accounts = instruction.accounts.reduce((acc, account, index) => {
-        acc.set(command.accounts[index], accountKeys[account].toBase58());
+        const instrAccount = command.accounts[index]
+        if (instrAccount) {
+          acc.set(instrAccount, accountKeys[account].toBase58());
+        }
 
         return acc;
       }, new Map<any, any>());

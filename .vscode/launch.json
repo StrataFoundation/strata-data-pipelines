@@ -43,8 +43,8 @@
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
         "KAFKA_TOPIC": "json.solana.blocks",
         "ANCHOR_IDLS": "",
-        // "ACCOUNTS": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
-        "ACCOUNTS": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL,TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,4K8fnycnTESeyad4DqfXPF8TbkuyscPK4EjAwY35emyW,AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
+        "ACCOUNTS": "namesLPneVptA9Z5rqUDD9tMTWEJwofgaYwp8cawRkX"
+        // "ACCOUNTS": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL,TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,4K8fnycnTESeyad4DqfXPF8TbkuyscPK4EjAwY35emyW,AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
       }
     },
     {
@@ -60,8 +60,7 @@
         "${workspaceFolder}/dist/lib/**/*.js"
       ],
       "env": {
-        "ANCHOR_IDLS": "B97SZXJBRUBHTZiaKB4PwUwzx4N8vkqWV6beAdhiMqqg,BFrD2YQKd8Fz4eeQrUsM8GEFw8UKR4oLWq4xHL6WJNtG",
-        "SOLANA_URL": "http://127.0.0.1:8899",
+        "ANCHOR_IDLS": "Bn6owcizWtLgeKcVyXVgUgTvbLezCVz9Q7oPdZu5bC1H,CJMw4wALbZJswJCxLsYUj2ExGCaEgMAp8JSGjodbxAF4",
         "S3_ENDPOINT": "http://localhost:9000",
         "S3_ACCESS_KEY_ID": "minioadmin",
         "S3_SECRET_ACCESS_KEY": "minioadmin",
@@ -72,8 +71,6 @@
         "KAFKA_OUTPUT_TOPIC": "json.solana.events",
         "KAFKA_OFFSET_RESET": "earliest",
         "KAFKA_GROUP_ID": "solana-event-transformer",
-        "TOKEN_BONDING_PROGRAM_ID": "4K8fnycnTESeyad4DqfXPF8TbkuyscPK4EjAwY35emyW",
-        "WUMBO_PROGRAM_ID": "AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
       }
     },
     {

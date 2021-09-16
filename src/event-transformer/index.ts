@@ -7,6 +7,7 @@ import TokenAccountTransformer from "./transformers/tokenAccounts";
 import BN from "bn.js";
 import "../utils/borshWithPubkeys";
 import tokenSpec from "./transformers/specs/token";
+import nameSpec from "./transformers/specs/name";
 import associatedTokenSpec from "./transformers/specs/associatedToken";
 import ProgramSpecTransformer from "./transformers/programSpec";
 import { connection } from "../setup/solana"
@@ -100,7 +101,7 @@ async function run() {
 
   const transformers: Transformer[] = [
     new TokenAccountTransformer(), 
-    new ProgramSpecTransformer(associatedTokenSpec, tokenSpec),
+    new ProgramSpecTransformer(associatedTokenSpec, tokenSpec, nameSpec),
     ...idls.map(idl => new AnchorProgramTransformer(idl))
   ];
   const consumer = kafka.consumer({
