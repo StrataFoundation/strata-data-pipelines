@@ -8,7 +8,7 @@ const { KAFKA_GROUP_ID, KAFKA_INPUT_TOPIC } = process.env
 async function accountPlugin(payload: EachBatchPayload) {
   const { batch: { messages } } = payload;
   const batch = redisClient.batch()
-  const balanceChanges = messages
+  const wumLockedMessages = messages
     .map(m => ({ ...JSON.parse(m.value!.toString()), mint: m.key }))
 
   // TODO: Ensure we aren't updating something updated in a more recent slot by another instance of this process.
@@ -19,19 +19,19 @@ async function accountPlugin(payload: EachBatchPayload) {
   // })
   // await promisify(redisClient.mset).bind(redisClient, "account-slots", relevantMessages.flatMap(msg => [msg.pubkey, msg.slot.toString()]))()
 
-  const balanceMessagesByMint = balanceChanges
-    .reduce((acc, balanceChange) => {
-      if (!acc.get(balanceChange.mint)) acc.set(balanceChange.mint, [])
-      acc.get(balanceChange.mint)!.push(balanceChange)
+  const wumLockedByMint = wumLockedMessages
+    .reduce((acc, wumLocked) => {
+      if (!acc.get(wumLocked.mint)) acc.set(wumLocked.mint, [])
+      acc.get(wumLocked.mint)!.push(wumLocked)
       return acc;
     }, new Map())
 
-  Array.from(balanceMessagesByMint)
+  Array.from(wumLockedByMint)
     .forEach((keyAndValue: any) => {
       const mint: string = keyAndValue[0];
       const balanceChanges: any[] = keyAndValue[1];
       const scoresAndValues = balanceChanges.flatMap((balanceChange: any) => {
-        return [Number(balanceChange.postAmount), balanceChange.pubkey]
+        return [Number(balanceChange.postAmount), balanceChange.owner]
       })
       // @ts-ignore
       batch.zadd(`accounts-by-balance-${mint}`, 'CH', ...scoresAndValues)

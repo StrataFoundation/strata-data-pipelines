@@ -1,6 +1,143 @@
 CREATE STREAM solana_events ("type" VARCHAR, "slot" BIGINT, "blockTime" BIGINT, "blockhash" VARCHAR, "recentBlockhash" VARCHAR, "payload" VARCHAR)
 WITH (kafka_topic='json.solana.events', value_format='json', partitions=1);
 
+CREATE OR REPLACE STREAM spl_wumbo_events
+WITH (kafka_topic='json.solana.spl_wumbo_events', value_format='json', partitions=1) 
+AS SELECT
+  "slot" AS "slot",
+  "blockhash" AS "blockhash",
+  "recentBlockhash" AS "recentBlockhash",
+  "blockTime" AS "blockTime",
+  "payload" AS "payload",
+  "type" as "type"
+FROM solana_events
+WHERE EXTRACTJSONFIELD("payload", '$.programId') = 'Bn6owcizWtLgeKcVyXVgUgTvbLezCVz9Q7oPdZu5bC1H';
+
+CREATE OR REPLACE STREAM spl_token_bonding_events
+WITH (kafka_topic='json.solana.spl_token_bonding_events', value_format='json', partitions=1) 
+AS SELECT
+  "slot" AS "slot",
+  "blockhash" AS "blockhash",
+  "recentBlockhash" AS "recentBlockhash",
+  "blockTime" AS "blockTime",
+  "payload" AS "payload",
+  "type" as "type"
+FROM solana_events
+WHERE EXTRACTJSONFIELD("payload", '$.programId') = 'CJMw4wALbZJswJCxLsYUj2ExGCaEgMAp8JSGjodbxAF4';
+
+CREATE OR REPLACE STREAM wumbo_create_unclaimed_tokens
+WITH (kafka_topic='json.solana.wumbo_create_unclaimed_tokens', value_format='json', partitions=1) 
+AS SELECT
+  "slot" AS "slot",
+  "blockhash" AS "blockhash",
+  "recentBlockhash" AS "recentBlockhash",
+  "blockTime" AS "blockTime",
+  EXTRACTJSONFIELD("payload", '$.instructionIndex') AS "instructionIndex",
+  EXTRACTJSONFIELD("payload", '$.innerIndex') AS "innerIndex",
+  EXTRACTJSONFIELD("payload", '$.data.args.nameParent') AS "nameParent",
+  EXTRACTJSONFIELD("payload", '$.data.args.nameClass') AS "nameClass",
+  EXTRACTJSONFIELD("payload", '$.accounts.initializeArgs.payer') AS "payer",
+  EXTRACTJSONFIELD("payload", '$.accounts.initializeArgs.wumbo') AS "wumbo",
+  EXTRACTJSONFIELD("payload", '$.accounts.initializeArgs.tokenBonding') AS "tokenBonding",
+  EXTRACTJSONFIELD("payload", '$.accounts.initializeArgs.baseRoyalties') AS "baseRoyalties",
+  EXTRACTJSONFIELD("payload", '$.accounts.initializeArgs.targetRoyalties') AS "targetRoyalties",
+  EXTRACTJSONFIELD("payload", '$.accounts.initializeArgs.targetMint') AS "targetMint",
+  EXTRACTJSONFIELD("payload", '$.accounts.initializeArgs.tokenMetadata') AS "tokenMetadata",
+  EXTRACTJSONFIELD("payload", '$.accounts.name') AS "name",
+  EXTRACTJSONFIELD("payload", '$.accounts.reverseTokenRef') AS "reverseTokenRef",
+  EXTRACTJSONFIELD("payload", '$.accounts.tokenRef') AS "tokenRef"
+FROM spl_wumbo_events
+WHERE "type" = 'initializeUnclaimedSocialTokenV0'
+EMIT CHANGES;
+
+CREATE OR REPLACE STREAM wumbo_create_owned_tokens
+WITH (kafka_topic='json.solana.wumbo_create_owned_tokens', value_format='json', partitions=1) 
+AS SELECT
+  "slot" AS "slot",
+  "blockhash" AS "blockhash",
+  "recentBlockhash" AS "recentBlockhash",
+  "blockTime" AS "blockTime",
+  EXTRACTJSONFIELD("payload", '$.instructionIndex') AS "instructionIndex",
+  EXTRACTJSONFIELD("payload", '$.innerIndex') AS "innerIndex",
+  EXTRACTJSONFIELD("payload", '$.data.args.nameParent') AS "nameParent",
+  EXTRACTJSONFIELD("payload", '$.data.args.nameClass') AS "nameClass",
+  EXTRACTJSONFIELD("payload", '$.accounts.initializeArgs.payer') AS "payer",
+  EXTRACTJSONFIELD("payload", '$.accounts.initializeArgs.wumbo') AS "wumbo",
+  EXTRACTJSONFIELD("payload", '$.accounts.initializeArgs.tokenBonding') AS "tokenBonding",
+  EXTRACTJSONFIELD("payload", '$.accounts.initializeArgs.baseRoyalties') AS "baseRoyalties",
+  EXTRACTJSONFIELD("payload", '$.accounts.initializeArgs.targetRoyalties') AS "targetRoyalties",
+  EXTRACTJSONFIELD("payload", '$.accounts.initializeArgs.targetMint') AS "targetMint",
+  EXTRACTJSONFIELD("payload", '$.accounts.initializeArgs.tokenMetadata') AS "tokenMetadata",
+  EXTRACTJSONFIELD("payload", '$.accounts.owner') AS "owner",
+  EXTRACTJSONFIELD("payload", '$.accounts.reverseTokenRef') AS "reverseTokenRef",
+  EXTRACTJSONFIELD("payload", '$.accounts.tokenRef') AS "tokenRef"
+FROM spl_wumbo_events
+WHERE "type" = 'initializeOwnedSocialTokenV0'
+EMIT CHANGES;
+
+CREATE OR REPLACE STREAM wumbo_token_claims
+WITH (kafka_topic='json.solana.wumbo_token_claims', value_format='json', partitions=1) 
+AS SELECT
+  "slot" AS "slot",
+  "blockhash" AS "blockhash",
+  "recentBlockhash" AS "recentBlockhash",
+  "blockTime" AS "blockTime",
+  EXTRACTJSONFIELD("payload", '$.instructionIndex') AS "instructionIndex",
+  EXTRACTJSONFIELD("payload", '$.innerIndex') AS "innerIndex",
+  EXTRACTJSONFIELD("payload", '$.accounts.wumbo') AS "wumbo",
+  EXTRACTJSONFIELD("payload", '$.accounts.tokenRef') AS "tokenRef",
+  EXTRACTJSONFIELD("payload", '$.accounts.newTokenRef') AS "newTokenRef",
+  EXTRACTJSONFIELD("payload", '$.accounts.reverseTokenRef') AS "reverseTokenRef",
+  EXTRACTJSONFIELD("payload", '$.accounts.tokenBonding') AS "tokenBonding",
+  EXTRACTJSONFIELD("payload", '$.accounts.tokenBondingAuthority') AS "tokenBondingAuthority",
+  EXTRACTJSONFIELD("payload", '$.accounts.targetRoyaltiesOwner') AS "targetRoyaltiesOwner",
+  EXTRACTJSONFIELD("payload", '$.accounts.newTargetRoyalties') AS "newTargetRoyalties",
+  EXTRACTJSONFIELD("payload", '$.accounts.targetRoyalties') AS "targetRoyalties",
+  EXTRACTJSONFIELD("payload", '$.accounts.name') AS "name",
+  EXTRACTJSONFIELD("payload", '$.accounts.owner') AS "owner"
+FROM spl_wumbo_events
+WHERE "type" = 'claimSocialTokenV0'
+EMIT CHANGES;
+
+CREATE STREAM wumbo_users(
+  "owner" VARCHAR,
+  "tokenRef" VARCHAR,
+  "reverseTokenRef" VARCHAR,
+  "tokenBonding" VARCHAR,
+  "blockTime" BIGINT
+)
+  WITH(kafka_topic='json.solana.wumbo_users', partitions=1, value_format='json');
+
+INSERT INTO wumbo_users SELECT
+  "owner",
+  "tokenRef",
+  "reverseTokenRef",
+  "tokenBonding",
+  "blockTime"
+FROM wumbo_token_claims
+EMIT CHANGES;
+
+INSERT INTO wumbo_users SELECT
+  "owner",
+  "tokenRef",
+  "reverseTokenRef",
+  "tokenBonding",
+  "blockTime"
+FROM wumbo_create_owned_tokens
+EMIT CHANGES;
+
+CREATE TABLE wumbo_users_table
+  WITH(kafka_topic='json.solana.wumbo_users_table', partitions=1, value_format='json')
+AS SELECT
+  "owner",
+  LATEST_BY_OFFSET("tokenRef") as "tokenRef",
+  LATEST_BY_OFFSET("reverseTokenRef") as "reverseTokenRef",
+  LATEST_BY_OFFSET("tokenBonding") as "tokenBonding",
+  LATEST_BY_OFFSET("blockTime") as "blockTime"
+FROM wumbo_users
+GROUP BY "owner"
+EMIT CHANGES;
+
 CREATE OR REPLACE TABLE token_bonding_initializes
 WITH (kafka_topic='json.solana.token_bonding_initializes', value_format='json', partitions=1) 
 AS SELECT
@@ -24,7 +161,7 @@ AS SELECT
   LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.accounts.targetRoyalties')) AS "targetRoyalties",
   LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.accounts.baseStorage')) AS "baseStorage",
   LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.accounts.baseStorageAuthority')) AS "baseStorageAuthority"
-FROM solana_events
+FROM spl_token_bonding_events
 WHERE "type" = 'initializeTokenBondingV0'
 GROUP BY EXTRACTJSONFIELD("payload", '$.accounts.targetMint');
 
@@ -81,7 +218,7 @@ AS SELECT
       AS DECIMAL(27, 9)
     ) 
   END AS "amount"
-FROM solana_events WHERE "type" = 'buyV0' or "type" = 'sellV0' EMIT CHANGES;
+FROM spl_token_bonding_events WHERE "type" = 'buyV0' or "type" = 'sellV0' EMIT CHANGES;
 
 CREATE TABLE token_bonding_supply 
 WITH (kafka_topic='json.solana.token_bonding_supply', partitions=1, value_format='json')
@@ -108,7 +245,7 @@ AS SELECT
   LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.instructionIndex')) AS "instructionIndex",
   LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.innerIndex')) AS "innerIndex",
   EXTRACTJSONFIELD("payload", '$.accounts.curve') AS "curve",
-  CAST(LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.data.args.taylorIterations')) AS INT) AS "taylorIterations",
+  CAST(LATEST_BY_OFFSET(EXTRACTJSONFIELD("payload", '$.data.args.logCurveV0.taylorIterations')) AS INT) AS "taylorIterations",
   CAST(
     CONCAT(
       SUBSTRING(LATEST_BY_OFFSET(LPAD(EXTRACTJSONFIELD("payload", '$.data.args.logCurveV0.g'), 46, '0')), 1, 46 - 12), 
@@ -123,7 +260,7 @@ AS SELECT
       SUBSTRING(LATEST_BY_OFFSET(LPAD(EXTRACTJSONFIELD("payload", '$.data.args.logCurveV0.c'), 46, '0')), 46 - 12 + 1, 12)
     ) AS DECIMAL(46, 12)
   ) AS "c"
-FROM solana_events
+FROM spl_token_bonding_events
 WHERE "type" = 'createCurveV0' AND EXTRACTJSONFIELD("payload", '$.data.args.logCurveV0') IS NOT NULL
 GROUP BY EXTRACTJSONFIELD("payload", '$.accounts.curve');
 
@@ -192,7 +329,7 @@ SELECT
 FROM bonding_token_account_balance_changes
 LEFT OUTER JOIN token_bonding_prices ON token_bonding_prices."targetMint" = bonding_token_account_balance_changes."mint"
 LEFT OUTER JOIN accounts ON accounts."account" = bonding_token_account_balance_changes."pubkey"
-WHERE "baseMint" IS NULL OR "baseMint" = 'EN75YBRFCoSezbkvRfbEqvsRU4mgXaDQjG7fkAtYjN9z';
+WHERE "baseMint" IS NULL OR "baseMint" = 'BgVmCfZXhcyibL5qa8vcqNzDcWGYxkmcg76s7hc3oRj4';
 
 INSERT INTO wum_locked_by_account
 SELECT
@@ -216,7 +353,7 @@ SELECT
   bonding_token_account_balance_changes."blockTime" as "blockTime"
 FROM bonding_token_account_balance_changes
 LEFT OUTER JOIN accounts ON accounts."account" = bonding_token_account_balance_changes."pubkey"
-WHERE bonding_token_account_balance_changes."mint" = 'EN75YBRFCoSezbkvRfbEqvsRU4mgXaDQjG7fkAtYjN9z';
+WHERE bonding_token_account_balance_changes."mint" = 'BgVmCfZXhcyibL5qa8vcqNzDcWGYxkmcg76s7hc3oRj4';
 
 -- Because accounts can come out of order, append the account if it comes in later:
 CREATE STREAM accounts_stream(
@@ -271,6 +408,20 @@ JOIN token_bonding_prices_stream WITHIN 2 HOURS ON wum_locked_by_account."mint" 
 WHERE wum_locked_by_account."wumLocked" IS NULL
 PARTITION BY "account";
 
+CREATE STREAM wumbo_users_wum_locked_by_account
+    WITH (kafka_topic='json.solana.wumbo_users_wum_locked_by_account', partitions=1, value_format='json')
+AS
+SELECT
+  "account",
+  wumbo_users_table."owner",
+  "tokenAmount",
+  "wumLocked",
+  "mint",
+  wum_locked_by_account."blockTime"
+FROM wum_locked_by_account
+JOIN wumbo_users_table ON wumbo_users_table."owner" = wum_locked_by_account."owner"
+EMIT CHANGES;
+
 CREATE TABLE wum_locked_by_account_table
     WITH (kafka_topic='json.solana.wum_locked_by_account_table', partitions=1, value_format='json')
 AS
@@ -291,4 +442,15 @@ AS
     SUM("wumLocked") AS "wumLocked"
   FROM wum_locked_by_account_table
   GROUP BY "owner"
+  EMIT CHANGES;
+
+-- WUM locked for only claimed users
+CREATE OR REPLACE TABLE wumbo_users_total_wum_locked
+WITH (kafka_topic='json.solana.wumbo_users_total_wum_locked', value_format='json', partitions=1)
+AS
+  SELECT 
+    wumbo_users_table."owner",
+    total_wum_locked."wumLocked"
+  FROM total_wum_locked
+  JOIN wumbo_users_table ON wumbo_users_table."owner" = total_wum_locked."owner"
   EMIT CHANGES;

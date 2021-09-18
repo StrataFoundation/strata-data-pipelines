@@ -3,7 +3,7 @@ import { BlockTransaction, Transformer } from "./Transformer";
 import { BinaryReader, deserializeUnchecked, baseDecode } from "borsh";
 import BN from "bn.js";
 import { Idl, Coder } from "@project-serum/anchor";
-import { IdlInstruction } from "@project-serum/anchor/dist/idl";
+import { IdlAccountItem, IdlInstruction } from "@project-serum/anchor/dist/idl";
 // @ts-ignore
 import * as bs58 from "bs58";
 import { stringify } from "uuid";
@@ -18,6 +18,8 @@ function recursiveTransformBN(args: any): Record<string, any> {
       acc[key] = value.toString(10);
     } else if (value instanceof PublicKey) {
       acc[key] = value.toBase58();
+    } else if (value && (value as any)._bn) {
+      acc[key] = new PublicKey(new BN((value as any)._bn, 'hex')).toBase58();
     } else if (typeof value === 'object' && value !== null) {
       acc[key] = recursiveTransformBN(value);
     } else {
@@ -39,8 +41,8 @@ export default class AnchorProgramTransformer extends InstructionTransformer {
 
     this.idl = idl;
     this.coder = new Coder(this.idl)
-    this.instructionNamesToInstructions = this.idl.instructions?.reduce((acc, IdlInstruction) => {
-      acc.set(IdlInstruction.name, IdlInstruction);
+    this.instructionNamesToInstructions = this.idl.instructions?.reduce((acc, idlInstruction) => {
+      acc.set(idlInstruction.name, idlInstruction);
 
       return acc;
     }, new Map<string, IdlInstruction>());
@@ -50,20 +52,33 @@ export default class AnchorProgramTransformer extends InstructionTransformer {
     return new Set([this.idl.metadata.address]);
   }
 
+
+  // While not listed in the types, accounts can be nested. Recursively constrcut the map of accounts
+  // ACCOUNTS WILL BE MUTATED. This operates by shifting on accounts
+  getAccounts(accounts: PublicKey[], idlAccounts: IdlAccountItem[]): Record<string, any> {
+    return idlAccounts.reduce((acc, idlAccount) => {
+      // @ts-ignore
+      if (idlAccount.accounts) {
+        // @ts-ignore
+        const output = this.getAccounts(accounts, idlAccount.accounts)
+        acc[idlAccount.name] = output;
+      } else {
+        acc[idlAccount.name] = accounts.shift()?.toBase58()
+      }
+
+      return acc;
+    }, {} as Record<string, any>)
+  }
+
   transformInstruction(accountKeys: PublicKey[], transaction: BlockTransaction, instruction: CompiledInstruction): any[] {
     const programId = accountKeys[instruction.programIdIndex].toBase58();
     const ixData = bs58.decode(instruction.data);
     let codedInstruction = this.coder.instruction.decode(ixData);
 
     if (codedInstruction) {
-      const accounts = instruction.accounts.reduce((acc, account, index) => {
-        const accountName = this.instructionNamesToInstructions.get(codedInstruction!.name)?.accounts[index].name;
-        if (accountName) {
-          acc[accountName] = accountKeys[account].toBase58()
-        }
-
-        return acc;
-      }, {} as Record<string, any>);
+      const idlAccounts = this.instructionNamesToInstructions.get(codedInstruction!.name)?.accounts!;
+      const accountsAsPubkeys = instruction.accounts.map(accountIndex => accountKeys[accountIndex]);
+      const accounts = this.getAccounts(accountsAsPubkeys, idlAccounts);
 
       return [{
         data: recursiveTransformBN(codedInstruction.data),

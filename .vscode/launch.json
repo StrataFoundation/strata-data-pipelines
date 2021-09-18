@@ -35,6 +35,7 @@
         "${workspaceFolder}/dist/lib/**/*.js"
       ],
       "env": {
+        // "SOLANA_URL": "https://api.devnet.solana.com",
         "S3_ENDPOINT": "http://localhost:9000",
         "S3_ACCESS_KEY_ID": "minioadmin",
         "S3_SECRET_ACCESS_KEY": "minioadmin",
@@ -42,8 +43,7 @@
         "S3_BUCKET": "wumbo-solana-blocks",
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
         "KAFKA_TOPIC": "json.solana.blocks",
-        "ANCHOR_IDLS": "",
-        "ACCOUNTS": "namesLPneVptA9Z5rqUDD9tMTWEJwofgaYwp8cawRkX"
+        "ACCOUNTS": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,namesLPneVptA9Z5rqUDD9tMTWEJwofgaYwp8cawRkX,Bn6owcizWtLgeKcVyXVgUgTvbLezCVz9Q7oPdZu5bC1H,CJMw4wALbZJswJCxLsYUj2ExGCaEgMAp8JSGjodbxAF4"
         // "ACCOUNTS": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL,TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,4K8fnycnTESeyad4DqfXPF8TbkuyscPK4EjAwY35emyW,AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
       }
     },
