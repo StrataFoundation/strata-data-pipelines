@@ -9,7 +9,7 @@ async function accountPlugin(payload: EachBatchPayload) {
   const { batch: { messages } } = payload;
   const batch = redisClient.batch()
   const wumLockedMessages = messages
-    .map(m => ({ ...JSON.parse(m.value!.toString()), mint: m.key }))
+    .map(m => ({ ...JSON.parse(m.value!.toString()), owner: m.key }))
 
   // TODO: Ensure we aren't updating something updated in a more recent slot by another instance of this process.
   // This was a start, but not working
@@ -31,7 +31,7 @@ async function accountPlugin(payload: EachBatchPayload) {
       const mint: string = keyAndValue[0];
       const balanceChanges: any[] = keyAndValue[1];
       const scoresAndValues = balanceChanges.flatMap((balanceChange: any) => {
-        return [Number(balanceChange.postAmount), balanceChange.owner]
+        return [Number(balanceChange.tokenAmount), balanceChange.owner]
       })
       // @ts-ignore
       batch.zadd(`accounts-by-balance-${mint}`, 'CH', ...scoresAndValues)
