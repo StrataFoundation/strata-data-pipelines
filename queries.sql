@@ -463,3 +463,10 @@ AS
   FROM total_wum_locked
   JOIN wumbo_users_table ON wumbo_users_table."owner" = total_wum_locked."owner"
   EMIT CHANGES;
+
+CREATE OR REPLACE TABLE global_total_wum_locked
+WITH (kafka_topic='json.solana.global_total_wum_locked')
+AS SELECT
+  1, SUM("wumLocked") as "totalWumLocked"
+FROM total_wum_locked GROUP BY 1
+EMIT CHANGES;

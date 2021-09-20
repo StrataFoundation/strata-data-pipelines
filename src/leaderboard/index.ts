@@ -5,6 +5,16 @@ import { EachBatchPayload } from "kafkajs";
 
 const { KAFKA_GROUP_ID, KAFKA_INPUT_TOPIC } = process.env
 
+async function totalWumLockedPlugin(payload: EachBatchPayload) {
+  const { batch: { messages } } = payload;
+  const globalTotalWumLocked = messages
+    .map(m => JSON.parse(m.value!.toString()))
+
+  const lastMsg = globalTotalWumLocked[globalTotalWumLocked.length - 1]
+  await promisify(redisClient.set).bind(redisClient)("total-wum-locked", lastMsg.totalWumLocked);
+  console.log(`Set total wum locked to ${lastMsg.totalWumLocked}`);
+}
+
 async function accountPlugin(payload: EachBatchPayload) {
   const { batch: { messages } } = payload;
   const batch = redisClient.batch()
@@ -80,7 +90,8 @@ async function topTokens(payload: EachBatchPayload) {
 const plugins = new Map([
   ["ACCOUNT", accountPlugin],
   ["WUM_LOCKED", wumLockedPlugin],
-  ["TOP_TOKENS", topTokens]
+  ["TOP_TOKENS", topTokens],
+  ["TOTAL_WUM_LOCKED", totalWumLockedPlugin]
 ])
 
 async function run() {

@@ -119,6 +119,28 @@
     {
       "type": "pwa-node",
       "request": "launch",
+      "name": "Total WUM locked",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "program": "${workspaceFolder}/src/leaderboard/index.ts",
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": [
+        "${workspaceFolder}/dist/lib/**/*.js"
+      ],
+      "env": {
+        "PLUGIN": "TOTAL_WUM_LOCKED",
+        "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
+        "KAFKA_INPUT_TOPIC": "json.solana.global_total_wum_locked",
+        "KAFKA_OFFSET_RESET": "earliest",
+        "KAFKA_GROUP_ID": "total-wum-locked",
+        "REDIS_HOST": "localhost",
+        "REDIS_PORT": "6379"
+      }
+    },
+    {
+      "type": "pwa-node",
+      "request": "launch",
       "name": "Process Blocks Local",
       "skipFiles": [
         "<node_internals>/**"
