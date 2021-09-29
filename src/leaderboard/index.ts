@@ -19,7 +19,7 @@ async function accountPlugin(payload: EachBatchPayload) {
   const { batch: { messages } } = payload;
   const batch = redisClient.batch()
   const wumLockedMessages = messages
-    .map(m => ({ ...JSON.parse(m.value!.toString()), owner: m.key }))
+    .map(m => ({ ...JSON.parse(m.value!.toString()), account: m.key }))
 
   // TODO: Ensure we aren't updating something updated in a more recent slot by another instance of this process.
   // This was a start, but not working

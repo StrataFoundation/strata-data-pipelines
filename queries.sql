@@ -11,7 +11,7 @@ AS SELECT
   "payload" AS "payload",
   "type" as "type"
 FROM solana_events
-WHERE EXTRACTJSONFIELD("payload", '$.programId') = 'Bn6owcizWtLgeKcVyXVgUgTvbLezCVz9Q7oPdZu5bC1H'
+WHERE EXTRACTJSONFIELD("payload", '$.programId') = 'WumbodN8t7wcDPCY2nGszs4x6HRtL5mJcTR519Qr6m7'
 EMIT CHANGES;
 
 CREATE OR REPLACE STREAM spl_token_bonding_events
@@ -24,7 +24,7 @@ AS SELECT
   "payload" AS "payload",
   "type" as "type"
 FROM solana_events
-WHERE EXTRACTJSONFIELD("payload", '$.programId') = 'CJMw4wALbZJswJCxLsYUj2ExGCaEgMAp8JSGjodbxAF4'
+WHERE EXTRACTJSONFIELD("payload", '$.programId') = 'TBondz6ZwSM5fs4v2GpnVBMuwoncPkFLFR9S422ghhN'
 EMIT CHANGES;
 
 CREATE OR REPLACE STREAM wumbo_create_unclaimed_tokens
@@ -168,8 +168,8 @@ WHERE "type" = 'initializeTokenBondingV0'
 GROUP BY EXTRACTJSONFIELD("payload", '$.accounts.targetMint')
 EMIT CHANGES;
 
-CREATE OR REPLACE STREAM bonding_token_account_balance_changes 
-WITH (kafka_topic='json.solana.bonding_token_account_balance_changes', value_format='json', partitions=1) 
+CREATE OR REPLACE STREAM token_account_balance_changes
+WITH (kafka_topic='json.solana.token_account_balance_changes', value_format='json', partitions=1)
 AS SELECT
   solana_events."type" as "type", 
   solana_events."slot" as "slot", 
@@ -179,13 +179,31 @@ AS SELECT
   EXTRACTJSONFIELD("payload", '$.instructionIndex') AS "instructionIndex",
   EXTRACTJSONFIELD("payload", '$.innerIndex') AS "innerIndex",
   EXTRACTJSONFIELD("payload", '$.pubkey') AS "pubkey",
-  token_bonding_initializes."targetMint" AS "mint",
+  EXTRACTJSONFIELD("payload", '$.mint') AS "mint",
   EXTRACTJSONFIELD("payload", '$.preAmount') AS "preAmount",
   EXTRACTJSONFIELD("payload", '$.postAmount') AS "postAmount",
   CAST(EXTRACTJSONFIELD("payload", '$.decimals') AS INTEGER) AS "decimals"
 FROM solana_events
-JOIN token_bonding_initializes ON token_bonding_initializes."targetMint" = EXTRACTJSONFIELD("payload", '$.mint')
 WHERE "type" = 'TokenAccountBalanceChange'
+EMIT CHANGES;
+
+CREATE OR REPLACE STREAM bonding_token_account_balance_changes 
+WITH (kafka_topic='json.solana.bonding_token_account_balance_changes', value_format='json', partitions=1) 
+AS SELECT
+  token_account_balance_changes."type" as "type", 
+  token_account_balance_changes."slot" as "slot", 
+  token_account_balance_changes."blockhash" as "blockhash",
+  token_account_balance_changes."blockTime" as "blockTime",
+  token_account_balance_changes."recentBlockhash" as "recentBlockhash",
+  token_account_balance_changes."instructionIndex" as "instructionIndex",
+  token_account_balance_changes."innerIndex" as "innerIndex",
+  token_account_balance_changes."pubkey" as "pubkey",
+  token_account_balance_changes."mint" as "mint",
+  token_account_balance_changes."preAmount" as "preAmount",
+  token_account_balance_changes."postAmount" as "postAmount",
+  token_account_balance_changes."decimals"
+FROM token_account_balance_changes
+JOIN token_bonding_initializes ON token_bonding_initializes."targetMint" = token_account_balance_changes."mint"
 EMIT CHANGES;
 
 CREATE OR REPLACE STREAM token_bonding_supply_changes
@@ -282,7 +300,7 @@ AS SELECT
   EXTRACTJSONFIELD("payload", '$.accounts.mint') AS "mint",
   EXTRACTJSONFIELD("payload", '$.accounts.owner') AS "owner"
 FROM solana_events
-WHERE "type" = 'InitializeAssociatedTokenAccount'
+WHERE "type" = 'InitializeTokenAccount'
 EMIT CHANGES;
 
 CREATE OR REPLACE TABLE accounts_table
@@ -319,6 +337,7 @@ EMIT CHANGES;
 CREATE OR REPLACE STREAM wum_locked_by_account ("account" VARCHAR KEY, "owner" VARCHAR, "tokenAmount" DECIMAL(27, 9), "wumLocked" DECIMAL(27, 9), "mint" VARCHAR, "blockTime" BIGINT)
     WITH (kafka_topic='json.solana.wum_locked_by_account', partitions=1, value_format='json');
 
+-- Creators
 INSERT INTO wum_locked_by_account
 SELECT
   bonding_token_account_balance_changes."pubkey" as "account",
@@ -348,11 +367,12 @@ SELECT
   bonding_token_account_balance_changes."mint" as "mint",
   bonding_token_account_balance_changes."blockTime" as "blockTime"
 FROM bonding_token_account_balance_changes
-LEFT OUTER JOIN token_bonding_prices ON token_bonding_prices."targetMint" = bonding_token_account_balance_changes."mint"
+JOIN token_bonding_prices ON token_bonding_prices."targetMint" = bonding_token_account_balance_changes."mint"
 LEFT OUTER JOIN accounts_table ON accounts_table."account" = bonding_token_account_balance_changes."pubkey"
-WHERE "baseMint" IS NULL OR "baseMint" = 'FghXoMJ1N7QSF5wTQpZK1bpn46T3cM4yoJeQq7mJpTcM'
+WHERE token_bonding_prices."baseMint" = '8ZEdEGcrPCLujEQuuUsmuosx2osuuCa8Hfm5WwKW73Ka'
 EMIT CHANGES;
 
+-- WUM mint
 INSERT INTO wum_locked_by_account
 SELECT
   bonding_token_account_balance_changes."pubkey" as "account",
@@ -375,7 +395,7 @@ SELECT
   bonding_token_account_balance_changes."blockTime" as "blockTime"
 FROM bonding_token_account_balance_changes
 LEFT OUTER JOIN accounts_table ON accounts_table."account" = bonding_token_account_balance_changes."pubkey"
-WHERE bonding_token_account_balance_changes."mint" = 'FghXoMJ1N7QSF5wTQpZK1bpn46T3cM4yoJeQq7mJpTcM'
+WHERE bonding_token_account_balance_changes."mint" = '8ZEdEGcrPCLujEQuuUsmuosx2osuuCa8Hfm5WwKW73Ka'
 EMIT CHANGES;
 
 INSERT INTO wum_locked_by_account
@@ -412,9 +432,9 @@ SELECT
   ) AS "wumLocked",
   wum_locked_by_account."mint" as "mint",
   wum_locked_by_account."blockTime" as "blockTime"
-FROM wum_locked_by_account
-JOIN token_bonding_prices_stream WITHIN 2 HOURS ON wum_locked_by_account."mint" = token_bonding_prices_stream."targetMint" 
-WHERE wum_locked_by_account."wumLocked" IS NULL
+FROM token_bonding_prices_stream
+JOIN wum_locked_by_account WITHIN 10 minutes ON wum_locked_by_account."mint" = token_bonding_prices_stream."targetMint" 
+WHERE wum_locked_by_account."wumLocked" IS NULL AND wum_locked_by_account."tokenAmount" IS NOT NULL AND token_bonding_prices_stream."price" IS NOT NULL
 PARTITION BY "account"
 EMIT CHANGES;
 
@@ -437,8 +457,24 @@ AS
 SELECT 
   "account",
   LATEST_BY_OFFSET("owner") AS "owner",
+  CAST(LATEST_BY_OFFSET(CAST("tokenAmount" AS VARCHAR)) AS DECIMAL(27, 9)) as "tokenAmount",
+  LATEST_BY_OFFSET("mint") as "mint",
   CAST(LATEST_BY_OFFSET(CAST("wumLocked" AS VARCHAR)) AS DECIMAL(27, 9)) as "wumLocked"
 FROM wum_locked_by_account
+WHERE "owner" IS NOT NULL AND "wumLocked" IS NOT NULL
+GROUP BY "account"
+EMIT CHANGES;
+
+CREATE TABLE wumbo_users_wum_locked_by_account_table
+    WITH (kafka_topic='json.solana.wumbo_users_wum_locked_by_account_table', partitions=1, value_format='json')
+AS
+SELECT 
+  "account",
+  LATEST_BY_OFFSET("owner") AS "owner",
+  CAST(LATEST_BY_OFFSET(CAST("tokenAmount" AS VARCHAR)) AS DECIMAL(27, 9)) as "tokenAmount",
+  LATEST_BY_OFFSET("mint") as "mint",
+  CAST(LATEST_BY_OFFSET(CAST("wumLocked" AS VARCHAR)) AS DECIMAL(27, 9)) as "wumLocked"
+FROM wumbo_users_wum_locked_by_account
 WHERE "owner" IS NOT NULL AND "wumLocked" IS NOT NULL
 GROUP BY "account"
 EMIT CHANGES;
