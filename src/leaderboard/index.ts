@@ -5,20 +5,19 @@ import { EachBatchPayload } from "kafkajs";
 
 const { KAFKA_GROUP_ID, KAFKA_INPUT_TOPIC } = process.env
 
-async function totalWumLockedPlugin(payload: EachBatchPayload) {
+async function totalWumNetWorthPlugin(payload: EachBatchPayload) {
   const { batch: { messages } } = payload;
-  const globalTotalWumLocked = messages
+  const globalTotalWumNetWorth = messages
     .map(m => JSON.parse(m.value!.toString()))
-
-  const lastMsg = globalTotalWumLocked[globalTotalWumLocked.length - 1]
-  await promisify(redisClient.set).bind(redisClient)("total-wum-locked", lastMsg.totalWumLocked);
-  console.log(`Set total wum locked to ${lastMsg.totalWumLocked}`);
+  const lastMsg = globalTotalWumNetWorth[globalTotalWumNetWorth.length - 1]
+  await promisify(redisClient.set).bind(redisClient)("total-wum-net-worth", lastMsg.totalWumNetWorth);
+  console.log(`Set total wum net worth to ${lastMsg.totalWumNetWorth}`);
 }
 
 async function accountPlugin(payload: EachBatchPayload) {
   const { batch: { messages } } = payload;
   const batch = redisClient.batch()
-  const wumLockedMessages = messages
+  const wumNetWorthMessages = messages
     .map(m => ({ ...JSON.parse(m.value!.toString()), account: m.key }))
 
   // TODO: Ensure we aren't updating something updated in a more recent slot by another instance of this process.
@@ -29,14 +28,14 @@ async function accountPlugin(payload: EachBatchPayload) {
   // })
   // await promisify(redisClient.mset).bind(redisClient, "account-slots", relevantMessages.flatMap(msg => [msg.pubkey, msg.slot.toString()]))()
 
-  const wumLockedByMint = wumLockedMessages
-    .reduce((acc, wumLocked) => {
-      if (!acc.get(wumLocked.mint)) acc.set(wumLocked.mint, [])
-      acc.get(wumLocked.mint)!.push(wumLocked)
+  const wumNetWorthByMint = wumNetWorthMessages
+    .reduce((acc, wumNetWorth) => {
+      if (!acc.get(wumNetWorth.mint)) acc.set(wumNetWorth.mint, [])
+      acc.get(wumNetWorth.mint)!.push(wumNetWorth)
       return acc;
     }, new Map())
 
-  Array.from(wumLockedByMint)
+  Array.from(wumNetWorthByMint)
     .forEach((keyAndValue: any) => {
       const mint: string = keyAndValue[0];
       const balanceChanges: any[] = keyAndValue[1];
@@ -52,21 +51,21 @@ async function accountPlugin(payload: EachBatchPayload) {
 }
 
 
-async function wumLockedPlugin(payload: EachBatchPayload) {
+async function wumNetWorthPlugin(payload: EachBatchPayload) {
   const { batch: { messages } } = payload;
   const batch = redisClient.batch()
-  const wumLockedChanges = messages
+  const wumNetWorthChanges = messages
     .map(m => ({ ...JSON.parse(m.value!.toString()), account: m.key.toString() }))
 
   // TODO: Ensure we aren't updating something updated in a more recent slot by another instance of this process.
   // This was a start, but not working
-  // const slots = await promisify(redisClient.mget).bind(redisClient, "wum-locked-slots", wumLockedChanges.map(m => m.account))()
-  // const relevantMessages = wumLockedChanges.filter((balanceChange, index) => {
+  // const slots = await promisify(redisClient.mget).bind(redisClient, "wum-locked-slots", wumNetWorthChanges.map(m => m.account))()
+  // const relevantMessages = wumNetWorthChanges.filter((balanceChange, index) => {
   //   return Number(slots[index]) < balanceChange.slot
   // })
   // await promisify(redisClient.mset).bind(redisClient, "wum-locked-slots", relevantMessages.flatMap(msg => [msg.account, msg.slot]))()
-  const toAdd = wumLockedChanges.flatMap(({ account, wumLocked }) => [wumLocked, account])
-  batch.zadd("wum-locked", 'CH', ...toAdd)
+  const toAdd = wumNetWorthChanges.flatMap(({ account, wumNetWorth }) => [wumNetWorth, account])
+  batch.zadd("wum-net-worth", 'CH', ...toAdd)
 
   const result = await promisify(batch.exec).bind(batch)();
   const numChanged = result.reduce((a, b) => a + b, 0);
@@ -89,9 +88,9 @@ async function topTokens(payload: EachBatchPayload) {
 
 const plugins = new Map([
   ["ACCOUNT", accountPlugin],
-  ["WUM_LOCKED", wumLockedPlugin],
+  ["WUM_NET_WORTH", wumNetWorthPlugin],
   ["TOP_TOKENS", topTokens],
-  ["TOTAL_WUM_LOCKED", totalWumLockedPlugin]
+  ["TOTAL_WUM_NET_WORTH", totalWumNetWorthPlugin]
 ])
 
 async function run() {

@@ -99,19 +99,15 @@ async function processSlot(slot: number) {
       };
     }
   } catch (e) {
-    if (e.message && e.message.includes(`Slot ${slot} was skipped`) || e.message.includes(`Block not available for slot ${slot}`)) {
-      console.log(`Slot ${slot} was skipped or missing`)
-      outputMsg = {
-        key: slot.toString(),
-        value: JSON.stringify({
-          slot,
-          skipped: true,
-          error: e.message
-        })
-      };
-    } else {
-      throw e;
-    }
+    console.error(e);
+    outputMsg = {
+      key: slot.toString(),
+      value: JSON.stringify({
+        slot,
+        skipped: true,
+        error: e.message,
+      })
+    };
   }
 
   await producer.send({
@@ -122,7 +118,8 @@ async function processSlot(slot: number) {
 
 async function run() {
   const consumer = kafka.consumer({
-    groupId: KAFKA_GROUP_ID!
+    groupId: KAFKA_GROUP_ID!,
+    maxBytes: 200
   });
   const admin = kafka.admin();
   await admin.connect();
