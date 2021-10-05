@@ -242,6 +242,42 @@ AS SELECT
 FROM spl_token_bonding_events WHERE "type" = 'buyV0' or "type" = 'sellV0'
 EMIT CHANGES;
 
+-- https://kafka-tutorials.confluent.io/finding-distinct-events/ksql.html
+CREATE OR REPLACE TABLE deduped_token_bonding_supply_changes
+WITH (kafka_topic='json.solana.deduped_token_bonding_supply_changes', key_format='json', value_format='json', partitions=1) 
+AS SELECT "type" AS k1, 
+          "slot" AS k2, 
+          "blockhash" AS k3, 
+          "recentBlockhash" AS k4, 
+          "blockTime" AS k5, 
+          "instructionIndex" AS k6, 
+          "innerIndex" AS k7, 
+          "tokenBonding" AS k8, 
+          "curve" AS k9, 
+          "baseMint" AS k10, 
+          "targetMint" AS k11, 
+          "amount" AS k12,
+          AS_VALUE("type") AS "type", 
+          AS_VALUE("slot") AS "slot", 
+          AS_VALUE("blockhash") AS "blockhash", 
+          AS_VALUE("recentBlockhash") AS "recentBlockhash", 
+          AS_VALUE("blockTime") AS "blockTime", 
+          AS_VALUE("instructionIndex") AS "instructionIndex", 
+          AS_VALUE("innerIndex") AS "innerIndex", 
+          AS_VALUE("tokenBonding") AS "tokenBonding", 
+          AS_VALUE("curve") AS "curve", 
+          AS_VALUE("baseMint") AS "baseMint", 
+          AS_VALUE("targetMint") AS "targetMint", 
+          AS_VALUE("amount") AS "amount"
+FROM token_bonding_supply_changes WINDOW TUMBLING (SIZE 5 MINUTES)
+GROUP BY "type", "slot", "blockhash", "recentBlockhash", "blockTime", "instructionIndex", "innerIndex", "tokenBonding", "curve", "baseMint", "targetMint", "amount"
+HAVING COUNT("type") = 1
+EMIT CHANGES;
+
+CREATE STREAM raw_deduped_token_bonding_supply_changes("type" VARCHAR, "slot" BIGINT, "blockTime" BIGINT, "blockhash" VARCHAR, "recentBlockhash" VARCHAR, "tokenBonding" VARCHAR, "curve" VARCHAR, "baseMint" VARCHAR, "targetMint" VARCHAR, "amount" DECIMAL(27, 9))
+WITH (kafka_topic='json.solana.deduped_token_bonding_supply_changes', key_format='json', value_format='json', partitions=1);
+
+
 CREATE TABLE token_bonding_supply 
 WITH (kafka_topic='json.solana.token_bonding_supply', partitions=1, value_format='json')
 AS SELECT
@@ -253,7 +289,7 @@ AS SELECT
   LATEST_BY_OFFSET("instructionIndex") AS "instructionIndex",
   LATEST_BY_OFFSET("innerIndex") AS "innerIndex",
   SUM("amount") as "supply"
-FROM token_bonding_supply_changes
+FROM RAW_DEDUPED_TOKEN_BONDING_SUPPLY_CHANGES
 GROUP BY "targetMint"
 EMIT CHANGES;
 
@@ -412,10 +448,8 @@ AS SELECT
   LATEST_BY_OFFSET("baseMint") AS "baseMint",
   LATEST_BY_OFFSET("tokenBonding") AS "tokenBonding", 
   LATEST_BY_OFFSET("blockTime") AS "blockTime",
-  LATEST_BY_OFFSET("instructionIndex") AS "instructionIndex",
-  LATEST_BY_OFFSET("innerIndex") AS "innerIndex",
   SUM("amount") as "supply"
-FROM token_bonding_supply_changes
+FROM RAW_DEDUPED_TOKEN_BONDING_SUPPLY_CHANGES
 WHERE "baseMint" = '8ZEdEGcrPCLujEQuuUsmuosx2osuuCa8Hfm5WwKW73Ka'
 GROUP BY "targetMint"
 EMIT CHANGES;
