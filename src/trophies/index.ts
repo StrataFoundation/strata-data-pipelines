@@ -1,6 +1,6 @@
 import { kafka } from "../setup/kafka";
 import { connection } from "../setup/solana";
-import { Keypair, PublicKey, sendAndConfirmTransaction, SystemInstruction, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction, TransactionInstruction } from "@solana/web3.js";
+import { Keypair, PublicKey, sendAndConfirmRawTransaction, sendAndConfirmTransaction, SystemInstruction, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction, TransactionInstruction } from "@solana/web3.js";
 import BN from "bn.js";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID, Token, MintLayout } from "@solana/spl-token";
 import { deserializeUnchecked } from 'borsh';
@@ -148,6 +148,18 @@ class Metadata {
   }
 }
 
+export class MasterEditionV2 {
+  key: MetadataKey;
+  supply: BN;
+  maxSupply?: BN;
+
+  constructor(args: { key: MetadataKey; supply: BN; maxSupply?: BN }) {
+    this.key = MetadataKey.MasterEditionV2;
+    this.supply = args.supply;
+    this.maxSupply = args.maxSupply;
+  }
+}
+
 const METADATA_SCHEMA = new Map<any, any>([
   [
     Metadata,
@@ -187,6 +199,17 @@ const METADATA_SCHEMA = new Map<any, any>([
       ],
     },
   ],
+  [
+    MasterEditionV2,
+    {
+      kind: 'struct',
+      fields: [
+        ['key', 'u8'],
+        ['supply', 'u64'],
+        ['maxSupply', { kind: 'option', type: 'u64' }],
+      ],
+    },
+  ]
 ]);
 
 
@@ -222,7 +245,6 @@ async function mintNewEditionFromMasterEditionViaTokenInstruction(
   const editionMarkPda = await getEditionMarkPda(tokenMint, edition);
 
   const data = Buffer.from([11, ...edition.toArray('le', 8)]);
-  console.log(masterMetadataKey.toBase58());
 
   const keys = [
     {
@@ -304,25 +326,27 @@ async function mintNewEditionFromMasterEditionViaTokenInstruction(
   });
 }
 
-let currentEditions = new Map<string, number>();
-async function getOrFindNextEdition(mint: PublicKey) {
-  if (currentEditions.has(mint.toBase58())) {
-    const next = currentEditions.get(mint.toBase58())! + 1
-    currentEditions.set(mint.toBase58(), next)
-    return next;
-  }
-  
-  let currentEdition = 0;
-  while (await connection.getAccountInfo(await getEditionMarkPda(mint, new BN(currentEdition)))) {
-    currentEdition += 1;
-  }
-  currentEditions.set(mint.toBase58(), currentEdition + 1);
+export const decodeMasterEdition = (
+  buffer: Buffer,
+): MasterEditionV2 => {
+  return deserializeUnchecked(
+    METADATA_SCHEMA,
+    MasterEditionV2,
+    buffer,
+  ) as MasterEditionV2;
+};
 
-  return currentEdition + 1;
+async function findNextEdition(mint: PublicKey) {
+  const edition = await getEdition(mint);
+  const acct = await connection.getAccountInfo(edition, "confirmed");
+  const editionNo = decodeMasterEdition(acct?.data!).supply.toNumber() + 1
+  console.log(`Next edition for ${mint} is ${editionNo}`)
+  return editionNo
 }
 
 const metaToTokenCache = new Map<string, PublicKey>();
 async function getMintFromMeta(meta: PublicKey): Promise<PublicKey> {
+  await connection.getAccountInfo(meta)
   if (metaToTokenCache.has(meta.toBase58())) {
     return metaToTokenCache.get(meta.toBase58())!;
   }
@@ -336,7 +360,8 @@ async function getMintFromMeta(meta: PublicKey): Promise<PublicKey> {
 
 async function run() {
   const consumer = kafka.consumer({
-    groupId: KAFKA_GROUP_ID!
+    groupId: KAFKA_GROUP_ID!,
+    maxBytes: 100
   });
 
   await consumer.connect();
@@ -345,13 +370,22 @@ async function run() {
     fromBeginning: process.env["KAFKA_OFFSET_RESET"] === "earliest"
   });
 
+  async function promiseAllInOrder<T>(it: (() => Promise<T>)[]): Promise<Iterable<T>> {
+    let ret: T[] = [];
+    for (const i of it) {
+      ret.push(await i());
+    }
+  
+    return ret;
+  }
+
   return new Promise((resolve, reject) => {
     consumer.run({
-      eachBatch: async (args) => {
+      eachBatch: async ({ batch: { messages: batchMessages } }) => {
         try {
-          const messages = args.batch.messages.map(m => JSON.parse(m.value!.toString()));
-          await Promise.all(
-            messages.map(async message => {
+          const messages = batchMessages.map(m => JSON.parse(m.value!.toString()));
+          await promiseAllInOrder(
+            messages.map(message => async () => {
               const destination = new PublicKey(message.destination)
               const trophyMasterEditionMeta = new PublicKey(message.trophyMasterEditionMeta);
               const masterEditionMint = await getMintFromMeta(trophyMasterEditionMeta);
@@ -411,10 +445,14 @@ async function run() {
                   serviceAccount.publicKey,
                   masterEditionAta,
                   serviceAccount.publicKey,
-                  new BN(await getOrFindNextEdition(masterEditionMint))
+                  new BN(await findNextEdition(masterEditionMint))
                 )
               ]
-              const txid = await sendAndConfirmTransaction(connection, txn, [serviceAccount, mint])
+              txn.recentBlockhash = (await connection.getRecentBlockhash("confirmed")).blockhash;
+              txn.sign(serviceAccount, mint);
+              const txid = await sendAndConfirmRawTransaction(connection, txn.serialize(), {
+                commitment: "confirmed"
+              })
 
               console.log(`Sent trophy ${message.trophyShortName}, trophy mint ${masterEditionMint.toBase58()}, trophy meta ${message.trophyMasterEdition} to ${destination.toBase58()} (${ata.toBase58()}) with mint ${mint.publicKey} and metadata ${metadata}, txid ${txid}`);
             })
