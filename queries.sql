@@ -27,6 +27,19 @@ FROM solana_events
 WHERE EXTRACTJSONFIELD("payload", '$.programId') = 'TBondz6ZwSM5fs4v2GpnVBMuwoncPkFLFR9S422ghhN'
 EMIT CHANGES;
 
+INSERT INTO spl_token_bonding_events
+SELECT
+  "slot" AS "slot",
+  "blockhash" AS "blockhash",
+  "recentBlockhash" AS "recentBlockhash",
+  "blockTime" AS "blockTime",
+  "payload" AS "payload",
+  "type" as "type"
+FROM solana_events
+WHERE EXTRACTJSONFIELD("payload", '$.programId') = 'TBondz6ZwSM5fs4v2GpnVBMuwoncPkFLFR9S422ghhN'
+      AND "blockTime" < 1632634064
+EMIT CHANGES;
+
 CREATE OR REPLACE STREAM wumbo_create_unclaimed_tokens
 WITH (kafka_topic='json.solana.wumbo_create_unclaimed_tokens', value_format='json', partitions=1) 
 AS SELECT
@@ -206,6 +219,52 @@ FROM token_account_balance_changes
 JOIN token_bonding_initializes ON token_bonding_initializes."targetMint" = token_account_balance_changes."mint"
 EMIT CHANGES;
 
+CREATE STREAM latest_bonding_token_account_balances(
+  "pubkey" VARCHAR KEY,
+  "type" VARCHAR, 
+  "slot" BIGINT, 
+  "blockhash" VARCHAR,
+  "blockTime" BIGINT,
+  "recentBlockhash" VARCHAR,
+  "instructionIndex" INTEGER,
+  "innerIndex" INTEGER,
+  "mint" VARCHAR,
+  "tokenAmount" DECIMAL(27, 9),
+  "decimals" INTEGER
+)
+  WITH(kafka_topic='json.solana.latest_bonding_token_account_balances', partitions=1, value_format='json');
+
+CREATE OR REPLACE TABLE bonding_token_account_balance_changes_high_watermark
+WITH (kafka_topic='json.solana.bonding_token_account_balance_changes_high_watermark', value_format='json', partitions=1)
+AS SELECT "pubkey", MAX("blockTime") as "maxBlockTime"
+FROM latest_bonding_token_account_balances
+GROUP BY "pubkey" 
+EMIT CHANGES;
+
+INSERT INTO latest_bonding_token_account_balances
+SELECT
+  bonding_token_account_balance_changes."type" as "type", 
+  bonding_token_account_balance_changes."slot" as "slot", 
+  bonding_token_account_balance_changes."blockhash" as "blockhash",
+  bonding_token_account_balance_changes."blockTime" as "blockTime",
+  bonding_token_account_balance_changes."recentBlockhash" as "recentBlockhash",
+  CAST(bonding_token_account_balance_changes."instructionIndex" as INT) as "instructionIndex",
+  CAST(bonding_token_account_balance_changes."innerIndex" as INT) as "innerIndex",
+  bonding_token_account_balance_changes."pubkey" as "pubkey",
+  bonding_token_account_balance_changes."mint" as "mint",
+  CAST(
+    CONCAT(
+      SUBSTRING(LPAD("postAmount", 27, '0'), 1, 27 - "decimals"), 
+      '.', 
+      SUBSTRING(LPAD("postAmount", 27, '0'), 27 - "decimals" + 1, "decimals")
+    ) AS DECIMAL(27, 9)
+  ) AS "tokenAmount",
+  bonding_token_account_balance_changes."decimals"
+FROM bonding_token_account_balance_changes
+LEFT OUTER JOIN bonding_token_account_balance_changes_high_watermark ON bonding_token_account_balance_changes_high_watermark."pubkey" = bonding_token_account_balance_changes."pubkey"
+WHERE "blockTime" > "maxBlockTime" OR "maxBlockTime" IS NULL
+EMIT CHANGES;
+
 CREATE OR REPLACE STREAM token_bonding_supply_changes
 WITH (kafka_topic='json.solana.token_bonding_supply_changes', value_format='json', partitions=1) 
 AS SELECT
@@ -242,7 +301,14 @@ AS SELECT
 FROM spl_token_bonding_events WHERE "type" = 'buyV0' or "type" = 'sellV0'
 EMIT CHANGES;
 
+
+-- This HAS to happen before the table create so that the compaction doesn't hide events with tombstones
+CREATE STREAM raw_deduped_token_bonding_supply_changes("type" VARCHAR, "slot" BIGINT, "blockTime" BIGINT, "blockhash" VARCHAR, "recentBlockhash" VARCHAR, "tokenBonding" VARCHAR, "curve" VARCHAR, "baseMint" VARCHAR, "targetMint" VARCHAR, "amount" DECIMAL(27, 9), "count" INT)
+WITH (kafka_topic='json.solana.deduped_token_bonding_supply_changes', key_format='json', value_format='json', partitions=1);
+
+
 -- https://kafka-tutorials.confluent.io/finding-distinct-events/ksql.html
+ SET 'cache.max.bytes.buffering' = '0';
 CREATE OR REPLACE TABLE deduped_token_bonding_supply_changes
 WITH (kafka_topic='json.solana.deduped_token_bonding_supply_changes', key_format='json', value_format='json', partitions=1) 
 AS SELECT "type" AS k1, 
@@ -268,29 +334,10 @@ AS SELECT "type" AS k1,
           AS_VALUE("curve") AS "curve", 
           AS_VALUE("baseMint") AS "baseMint", 
           AS_VALUE("targetMint") AS "targetMint", 
-          AS_VALUE("amount") AS "amount"
-FROM token_bonding_supply_changes WINDOW TUMBLING (SIZE 5 MINUTES)
+          AS_VALUE("amount") AS "amount",
+          COUNT("type") AS "count"
+FROM token_bonding_supply_changes WINDOW TUMBLING (SIZE 31 DAYS, GRACE PERIOD 31 DAYS)
 GROUP BY "type", "slot", "blockhash", "recentBlockhash", "blockTime", "instructionIndex", "innerIndex", "tokenBonding", "curve", "baseMint", "targetMint", "amount"
-HAVING COUNT("type") = 1
-EMIT CHANGES;
-
-CREATE STREAM raw_deduped_token_bonding_supply_changes("type" VARCHAR, "slot" BIGINT, "blockTime" BIGINT, "blockhash" VARCHAR, "recentBlockhash" VARCHAR, "tokenBonding" VARCHAR, "curve" VARCHAR, "baseMint" VARCHAR, "targetMint" VARCHAR, "amount" DECIMAL(27, 9))
-WITH (kafka_topic='json.solana.deduped_token_bonding_supply_changes', key_format='json', value_format='json', partitions=1);
-
-
-CREATE TABLE token_bonding_supply 
-WITH (kafka_topic='json.solana.token_bonding_supply', partitions=1, value_format='json')
-AS SELECT
-  "targetMint",
-  LATEST_BY_OFFSET("curve") AS "curve",
-  LATEST_BY_OFFSET("baseMint") AS "baseMint",
-  LATEST_BY_OFFSET("tokenBonding") AS "tokenBonding", 
-  LATEST_BY_OFFSET("blockTime") AS "blockTime",
-  LATEST_BY_OFFSET("instructionIndex") AS "instructionIndex",
-  LATEST_BY_OFFSET("innerIndex") AS "innerIndex",
-  SUM("amount") as "supply"
-FROM RAW_DEDUPED_TOKEN_BONDING_SUPPLY_CHANGES
-GROUP BY "targetMint"
 EMIT CHANGES;
 
 CREATE OR REPLACE TABLE log_curves 
@@ -357,89 +404,6 @@ EMIT CHANGES;
 CREATE OR REPLACE STREAM wum_net_worth_by_account ("account" VARCHAR KEY, "curve" VARCHAR, "owner" VARCHAR, "tokenAmount" DECIMAL(27, 9), "wumNetWorth" DECIMAL(27, 9), "mint" VARCHAR, "blockTime" BIGINT)
     WITH (kafka_topic='json.solana.wum_net_worth_by_account', partitions=1, value_format='json');  
 
--- Creators
-INSERT INTO wum_net_worth_by_account
-SELECT
-  bonding_token_account_balance_changes."pubkey" as "account",
-  log_curves."curve" as "curve",
-  accounts_table."owner" as "owner",
-  CAST(
-    CONCAT(
-      SUBSTRING(LPAD("postAmount", 27, '0'), 1, 27 - "decimals"), 
-      '.', 
-      SUBSTRING(LPAD("postAmount", 27, '0'), 27 - "decimals" + 1, "decimals")
-    ) AS DECIMAL(27, 9)
-  ) AS "tokenAmount",
-  CASE WHEN "supply" IS NULL THEN
-    NULL
-  ELSE
-  CAST((log_curves."c" * (
-      (
-        ((1 / log_curves."g") + 
-          "supply"
-        ) * LN(1 + log_curves."g" * "supply") - "supply"
-      ) - (
-        ((1 / log_curves."g") + 
-          ("supply" - CAST(
-            CONCAT(
-              SUBSTRING(LPAD("postAmount", 27, '0'), 1, 27 - "decimals"), 
-              '.', 
-              SUBSTRING(LPAD("postAmount", 27, '0'), 27 - "decimals" + 1, "decimals")
-            ) AS DECIMAL(27, 9)
-          ))
-        ) * LN(1 + log_curves."g" * ("supply" - CAST(
-            CONCAT(
-              SUBSTRING(LPAD("postAmount", 27, '0'), 1, 27 - "decimals"), 
-              '.', 
-              SUBSTRING(LPAD("postAmount", 27, '0'), 27 - "decimals" + 1, "decimals")
-            ) AS DECIMAL(27, 9)
-          ))) - ("supply" - CAST(
-            CONCAT(
-              SUBSTRING(LPAD("postAmount", 27, '0'), 1, 27 - "decimals"), 
-              '.', 
-              SUBSTRING(LPAD("postAmount", 27, '0'), 27 - "decimals" + 1, "decimals")
-            ) AS DECIMAL(27, 9)
-          ))
-      )
-    )
-  ) AS DECIMAL(27, 9))
-  END AS "wumNetWorth",
-  bonding_token_account_balance_changes."mint" as "mint",
-  bonding_token_account_balance_changes."blockTime" as "blockTime"
-FROM bonding_token_account_balance_changes
-JOIN token_bonding_supply ON token_bonding_supply."targetMint" = bonding_token_account_balance_changes."mint"
-INNER JOIN log_curves ON token_bonding_supply."curve" = log_curves."curve"
-LEFT OUTER JOIN accounts_table ON accounts_table."account" = bonding_token_account_balance_changes."pubkey"
-WHERE token_bonding_supply."baseMint" = '8ZEdEGcrPCLujEQuuUsmuosx2osuuCa8Hfm5WwKW73Ka'
-EMIT CHANGES;
-
--- WUM mint
-INSERT INTO wum_net_worth_by_account
-SELECT
-  bonding_token_account_balance_changes."pubkey" as "account",
-  '' as "curve",
-  accounts_table."owner" as "owner",
-  CAST(
-    CONCAT(
-      SUBSTRING(LPAD("postAmount", 27, '0'), 1, 27 - "decimals"), 
-      '.', 
-      SUBSTRING(LPAD("postAmount", 27, '0'), 27 - "decimals" + 1, "decimals")
-    ) AS DECIMAL(27, 9)
-  ) AS "tokenAmount",
-  CAST(
-    CONCAT(
-      SUBSTRING(LPAD("postAmount", 27, '0'), 1, 27 - "decimals"), 
-      '.', 
-      SUBSTRING(LPAD("postAmount", 27, '0'), 27 - "decimals" + 1, "decimals")
-    ) AS DECIMAL(27, 9)
-  ) AS "wumNetWorth",
-  bonding_token_account_balance_changes."mint" as "mint",
-  bonding_token_account_balance_changes."blockTime" as "blockTime"
-FROM bonding_token_account_balance_changes
-LEFT OUTER JOIN accounts_table ON accounts_table."account" = bonding_token_account_balance_changes."pubkey"
-WHERE bonding_token_account_balance_changes."mint" = '8ZEdEGcrPCLujEQuuUsmuosx2osuuCa8Hfm5WwKW73Ka'
-EMIT CHANGES;
-
 CREATE TABLE wumbo_token_bonding_supply 
 WITH (kafka_topic='json.solana.wumbo_token_bonding_supply', partitions=1, value_format='json')
 AS SELECT
@@ -451,7 +415,54 @@ AS SELECT
   SUM("amount") as "supply"
 FROM RAW_DEDUPED_TOKEN_BONDING_SUPPLY_CHANGES
 WHERE "baseMint" = '8ZEdEGcrPCLujEQuuUsmuosx2osuuCa8Hfm5WwKW73Ka'
+AND "count" = 1
 GROUP BY "targetMint"
+EMIT CHANGES;
+
+-- Creators
+INSERT INTO wum_net_worth_by_account
+SELECT
+  latest_bonding_token_account_balances."pubkey" as "account",
+  log_curves."curve" as "curve",
+  accounts_table."owner" as "owner",
+  "tokenAmount",
+  CASE WHEN "supply" IS NULL THEN
+    NULL
+  ELSE
+  CAST((log_curves."c" * (
+      (
+        ((1 / log_curves."g") + 
+          "supply"
+        ) * LN(1 + log_curves."g" * "supply") - "supply"
+      ) - (
+        ((1 / log_curves."g") + 
+          ("supply" - "tokenAmount")
+        ) * LN(1 + log_curves."g" * ("supply" - "tokenAmount")) - ("supply" - "tokenAmount")
+      )
+    )
+  ) AS DECIMAL(27, 9))
+  END AS "wumNetWorth",
+  latest_bonding_token_account_balances."mint" as "mint",
+  latest_bonding_token_account_balances."blockTime" as "blockTime"
+FROM latest_bonding_token_account_balances
+JOIN wumbo_token_bonding_supply ON wumbo_token_bonding_supply."targetMint" = latest_bonding_token_account_balances."mint"
+INNER JOIN log_curves ON wumbo_token_bonding_supply."curve" = log_curves."curve"
+LEFT OUTER JOIN accounts_table ON accounts_table."account" = latest_bonding_token_account_balances."pubkey"
+EMIT CHANGES;
+
+-- WUM mint
+INSERT INTO wum_net_worth_by_account
+SELECT
+  latest_bonding_token_account_balances."pubkey" as "account",
+  '' as "curve",
+  accounts_table."owner" as "owner",
+  latest_bonding_token_account_balances."tokenAmount" AS "tokenAmount",
+  latest_bonding_token_account_balances."tokenAmount" AS "wumNetWorth",
+  latest_bonding_token_account_balances."mint" as "mint",
+  latest_bonding_token_account_balances."blockTime" as "blockTime"
+FROM latest_bonding_token_account_balances
+LEFT OUTER JOIN accounts_table ON accounts_table."account" = latest_bonding_token_account_balances."pubkey"
+WHERE latest_bonding_token_account_balances."mint" = '8ZEdEGcrPCLujEQuuUsmuosx2osuuCa8Hfm5WwKW73Ka'
 EMIT CHANGES;
 
 INSERT INTO wum_net_worth_by_account
@@ -586,3 +597,38 @@ AS SELECT
   1, SUM("wumNetWorth") as "totalWumNetWorth"
 FROM total_wum_net_worth GROUP BY 1
 EMIT CHANGES;
+
+CREATE STREAM blocks (
+  "slot" INT,
+  "skipped" BOOLEAN,
+  "error" VARCHAR
+)
+WITH (kafka_topic='json.solana.blocks', value_format='json', partitions=1);
+
+CREATE STREAM slots (
+  "key" INT KEY,
+  "slot" INT
+)
+WITH (kafka_topic='json.solana.slots', value_format='json', partitions=8);
+
+SET 'cache.max.bytes.buffering' = '0';
+CREATE TABLE retriable_blocks
+WITH (kafka_topic='json.solana.retriable_blocks', value_format='json')
+AS 
+SELECT "slot" as "key", COUNT("slot") as "count", AS_VALUE("slot") AS "slot"
+FROM blocks 
+WHERE "skipped" = true AND "error" like '%Block not available%'
+GROUP BY "slot"
+emit changes;
+
+CREATE STREAM raw_retriable_blocks(
+  "key" INT KEY,
+  "slot" INT,
+  "count" INT
+)
+WITH (kafka_topic='json.solana.retriable_blocks', value_format='json');
+
+INSERT INTO slots
+SELECT "key", "slot"
+FROM raw_retriable_blocks
+WHERE "count" = 1;
