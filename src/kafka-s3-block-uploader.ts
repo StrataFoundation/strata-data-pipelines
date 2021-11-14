@@ -10,8 +10,7 @@ const FINALITY: Finality = (process.env["FINALITY"] || 'finalized') as Finality;
 const S3_BUCKET = process.env["S3_BUCKET"]!
 const S3_PREFIX = process.env["S3_PREFIX"]!
 const ACCOUNTS = new Set(process.env["ACCOUNTS"]!.split(","))
-const { KAFKA_TOPIC } = process.env
-
+const { KAFKA_TOPIC, KAFKA_INPUT_TOPIC, KAFKA_GROUP_ID } = process.env
 
 const producer = kafka.producer()
 
@@ -53,7 +52,7 @@ async function processSlot(slot: number) {
     const block = await connection.getBlock(slot, { commitment: FINALITY });
     const fileInfo = {
       Bucket: S3_BUCKET,
-      Key: `${S3_PREFIX}/${slot}.json.gz`,
+      Key: `${S3_PREFIX}/${slot.toString().padStart(16, '0')}.json.gz`,
     }
     const filteredBlock = {
       ...block,
@@ -100,19 +99,15 @@ async function processSlot(slot: number) {
       };
     }
   } catch (e) {
-    if (e.message && e.message.includes(`Slot ${slot} was skipped`)) {
-      console.log(`Slot ${slot} was skipped or missing`)
-      outputMsg = {
-        key: slot.toString(),
-        value: JSON.stringify({
-          slot,
-          skipped: true,
-          error: e.message
-        })
-      };
-    } else {
-      throw e;
-    }
+    console.error(e);
+    outputMsg = {
+      key: slot.toString(),
+      value: JSON.stringify({
+        slot,
+        skipped: true,
+        error: e.message,
+      })
+    };
   }
 
   await producer.send({
@@ -121,80 +116,39 @@ async function processSlot(slot: number) {
   })
 }
 
-async function getKafkaSlot(): Promise<number | null> {
-  console.log("Searching for last max block...")
+async function run() {
   const consumer = kafka.consumer({
-    groupId: `kafka-s3-block-writer-${uuidv4()}`
-  });
-  await consumer.connect();
-  await consumer.subscribe({
-    topic: KAFKA_TOPIC!,
-    fromBeginning: false
+    groupId: KAFKA_GROUP_ID!,
+    maxBytes: 200
   });
   const admin = kafka.admin();
   await admin.connect();
-  
-  let maxSlot: number | null = null
-  consumer.run({
-    eachBatchAutoResolve: false,
-    eachBatch: async ({ batch: { messages } }) => {
-      messages.forEach(message => {
-        const msgSlot = JSON.parse(message.value!.toString()).slot
-        if (msgSlot > (maxSlot || 0)) {
-          maxSlot = msgSlot
-        }
-      })
-    }
-  })
+  // Force failure if topic doesn't exist
+  await admin.fetchTopicMetadata({ topics: [KAFKA_INPUT_TOPIC!] })
+  await admin.disconnect();
 
-  const offsets = await admin.fetchTopicOffsets(KAFKA_TOPIC!)
-  await Promise.all(
-    offsets.map(async offset => {
-      await consumer.seek({
-        topic: KAFKA_TOPIC!,
-        partition: offset.partition,
-        offset: (Number(offset.high) - 1).toString()
-      })
-    })
-  );
+  await producer.connect();
+  await consumer.connect();
+  await consumer.subscribe({
+    topic: KAFKA_INPUT_TOPIC!,
+    fromBeginning: process.env["KAFKA_OFFSET_RESET"] === "earliest"
+  });
 
   return new Promise((resolve, reject) => {
-    setTimeout(async () => {
-      try {
-        await admin.disconnect();
-        await consumer.disconnect()
-      } catch (e) {
-        reject(e)
+    consumer.run({
+      eachBatch: async ({ batch: { messages } }) => {
+        try {
+          await Promise.all(
+            messages.map(({ value }) => JSON.parse(value!.toString()).slot).map(slot =>
+              processSlot(slot)
+            )
+          )
+        } catch (e) {
+          reject(e);
+        }
       }
-      console.log(`Found slot ${maxSlot} in kafka`)
-      resolve(maxSlot ? maxSlot + 1 : maxSlot)
-    }, 10 * 1000)
-  })
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => {
-    setTimeout(() => resolve(null), ms);
-  })
-}
-
-async function run() {
-  const startSlot = (START_SLOT && Number(START_SLOT)) || await getKafkaSlot() || await connection.getSlot(FINALITY);
-  await producer.connect();
-  let currentSlot = startSlot;
-  let maxSlot = await connection.getSlot(FINALITY);
-
-  while (true) {
-    if (currentSlot <= maxSlot) {
-      await processSlot(currentSlot)
-      currentSlot += 1
-    }
-    if (currentSlot > maxSlot) {
-      console.log("Caught up, fetching current slot")
-      maxSlot = await connection.getSlot(FINALITY)
-      await sleep(1000) // If you set this too low, get too many requests
-    }
-  }
+    })
+  });
 }
 
 run().catch(e => {

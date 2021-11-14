@@ -33,6 +33,17 @@ services:
     environment: 
       KAFKA_BROKERS: kafka:9092
     restart: always
+  kafka_admin:
+    image: hlebalbau/kafka-manager:stable
+    command:
+      - "-Dhttp.port=9005"
+    ports:
+      - 9002:9005
+    depends_on:
+      - kafka
+      - zookeeper
+    environment:
+      ZK_HOSTS: zookeeper:2181
   minio:
     image: minio/minio:latest
     command: "server /data --console-address \":9001\""

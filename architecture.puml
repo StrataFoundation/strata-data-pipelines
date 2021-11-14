@@ -78,7 +78,7 @@ WumLockedLeaderboard -> Redis
 token_bonding_supply -> TopTokensLeaderboard
 TopTokensLeaderboard -> Redis
 
-bonding_token_account_balance_changes -> AccountLeaderboard
+wum_locked_by_account -> AccountLeaderboard
 AccountLeaderboard -> Redis
 
 Redis -> WumboAPI

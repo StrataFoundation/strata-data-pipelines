@@ -89,3 +89,12 @@ You can use kowl at localhost:8080 to see what's going into the topics.
 If you'd like to start the leaderboard, there are vscode launch configs for those as well.
 
 The API is a separate repo, `wumbo-api`
+
+
+# Trophies
+
+To test, you can run 
+
+```
+jq -rc . tests/resources/trophy.json | kafka-console-producer.sh --topic json.solana.trophies --bootstrap-server localhost:29092
+```

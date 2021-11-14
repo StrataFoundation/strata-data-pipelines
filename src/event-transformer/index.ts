@@ -1,16 +1,18 @@
 import { kafka } from "../setup/kafka";
 import { s3 } from "../setup/s3";
-import { TokenBalance, Message, BlockResponse, ConfirmedTransactionMeta, PublicKey, Transaction } from "@solana/web3.js";
+import { TokenBalance, Message, BlockResponse, ConfirmedTransactionMeta, PublicKey, Transaction, Keypair } from "@solana/web3.js";
 import { Message as KafkaMessage, Producer, ProducerBatch, TopicMessages } from "kafkajs";
 import { BlockTransaction, Transformer } from "./transformers/Transformer";
 import TokenAccountTransformer from "./transformers/tokenAccounts";
 import BN from "bn.js";
 import "../utils/borshWithPubkeys";
-import wumboSpec from "./transformers/specs/wumbo";
-import tokenBondingSpec from "./transformers/specs/tokenBonding";
 import tokenSpec from "./transformers/specs/token";
+import nameSpec from "./transformers/specs/name";
 import associatedTokenSpec from "./transformers/specs/associatedToken";
 import ProgramSpecTransformer from "./transformers/programSpec";
+import { connection } from "../setup/solana"
+import { Program, Provider, Wallet as NodeWallet } from "@project-serum/anchor";
+import AnchorProgramTransformer from "./transformers/anchorProgram";
 
 const { KAFKA_GROUP_ID, KAFKA_INPUT_TOPIC, KAFKA_OUTPUT_TOPIC } = process.env
 
@@ -24,11 +26,7 @@ function hasIntersect(set1: Set<any>, set2: Set<any>): boolean {
   return [...set1].some(x => set2.has(x));
 }
 
-const transformers: Transformer[] = [
-  new TokenAccountTransformer(), 
-  new ProgramSpecTransformer(associatedTokenSpec, tokenSpec, wumboSpec, tokenBondingSpec)
-];
-function processTxn(block: BlockResponse & { slot: number }, txn: BlockTransaction): KafkaMessage[] {
+function processTxn(transformers: Transformer[], block: BlockResponse & { slot: number }, txn: BlockTransaction): KafkaMessage[] {
   const accounts = txn.transaction.message.accountKeys.map((key) => (
     // @ts-ignore
     new PublicKey(new BN(key._bn, 'hex'))
@@ -89,6 +87,23 @@ async function publishFixedBatches(producer: Producer, batch: TopicMessages, max
 }
 
 async function run() {
+  const idls = await Promise.all((process.env["ANCHOR_IDLS"]?.split(",").map(v => v.trim()) || []).map(async idlPubkey => {
+    const idl = await Program.fetchIdl(idlPubkey, new Provider(
+      connection,
+      new NodeWallet(new Keypair),
+      {}
+    ))
+    idl.metadata = {
+      address: idlPubkey
+    }
+    return idl;
+  }))
+
+  const transformers: Transformer[] = [
+    new TokenAccountTransformer(), 
+    new ProgramSpecTransformer(associatedTokenSpec, tokenSpec, nameSpec),
+    ...idls.map(idl => new AnchorProgramTransformer(idl))
+  ];
   const consumer = kafka.consumer({
     groupId: KAFKA_GROUP_ID!
   });
@@ -116,7 +131,7 @@ async function run() {
                 const block: BlockResponse & { slot: number } = JSON.parse(s3Resp.Body!.toString());
                 const ret: KafkaMessage[] = block.transactions
                   .filter(txn => !txn.meta?.err)
-                  .flatMap((txn: BlockTransaction) => processTxn(block, txn))
+                  .flatMap((txn: BlockTransaction) => processTxn(transformers, block, txn))
   
                 return ret;
               })
