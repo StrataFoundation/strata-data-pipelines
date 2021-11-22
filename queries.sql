@@ -617,7 +617,7 @@ WITH (kafka_topic='json.solana.retriable_blocks', value_format='json')
 AS 
 SELECT "slot" as "key", COUNT("slot") as "count", AS_VALUE("slot") AS "slot"
 FROM blocks 
-WHERE "skipped" = true AND "error" like '%Block not available%'
+WHERE "skipped" = true AND ("error" like '%Block not available%' OR "error" like '%cleaned up, does not exist on node%')
 GROUP BY "slot"
 emit changes;
 
@@ -628,7 +628,13 @@ CREATE STREAM raw_retriable_blocks(
 )
 WITH (kafka_topic='json.solana.retriable_blocks', value_format='json');
 
-INSERT INTO slots
+CREATE STREAM missed_slots (
+  "key" INT KEY,
+  "slot" INT
+)
+WITH (kafka_topic='json.solana.missed_slots', value_format='json', partitions=1);
+INSERT INTO missed_slots
 SELECT "key", "slot"
 FROM raw_retriable_blocks
-WHERE "count" = 1;
+WHERE "count" = 1
+EMIT CHANGES;

@@ -3,6 +3,7 @@
 package "Kafka + KSQL" as k {
   queue accounts #fff
   queue blocks
+  queue slots
   queue bonding_token_account_balance_changes
   queue token_bonding_initializes #fff
   queue curves #fff
@@ -56,13 +57,17 @@ agent AccountLeaderboard
 agent WumLockedLeaderboard
 agent TopTokensLeaderboard
 agent WumboAPI
+agent SlotIdentiier
 
 cloud Solana
 cloud S3
 database Redis
 person UI
 
-Solana -> KafkaS3BlockUploader
+Solana -> SlotIdentiier
+SlotIdentiier -> slots
+Solana --> KafkaS3BlockUploader
+slots --> KafkaS3BlockUploader
 KafkaS3BlockUploader -> blocks
 KafkaS3BlockUploader -> S3
 
