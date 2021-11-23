@@ -5,6 +5,15 @@ import { EachBatchPayload } from "kafkajs";
 
 const { KAFKA_GROUP_ID, KAFKA_INPUT_TOPIC } = process.env
 
+async function totalWumNetWorthPlugin(payload: EachBatchPayload) {
+  const { batch: { messages } } = payload;
+  const globalTotalWumNetWorth = messages
+    .map(m => JSON.parse(m.value!.toString()))
+  const lastMsg = globalTotalWumNetWorth[globalTotalWumNetWorth.length - 1]
+  await promisify(redisClient.set).bind(redisClient)("total-wum-net-worth", lastMsg.totalWumNetWorth);
+  console.log(`Set total wum net worth to ${lastMsg.totalWumNetWorth}`);
+}
+
 async function accountPlugin(payload: EachBatchPayload) {
   const { batch: { messages } } = payload;
   const batch = redisClient.batch()
