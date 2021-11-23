@@ -1,4 +1,4 @@
-Wumbo Data Pipeline
+Strata Data Pipelines
 ====================
 
 ## Install Deps
@@ -52,7 +52,7 @@ aws ecr get-login-password --region us-east-2 | docker login --username AWS --pa
 docker build --build-arg NPM_TOKEN=$NPM_TOKEN .
 ```
 
-You should use the `wumbo-terraform` repo to deploy the full pipeline. We use app.terraform.io to provision and launch terraform objects on AWS.
+You should use the `strata-terraform` repo to deploy the full pipeline. We use app.terraform.io to provision and launch terraform objects on AWS.
 
 # Local Development
 
@@ -64,7 +64,7 @@ docker-compose up
 
 Then, create the bucket we're going to use in minio by going to localhost:9000. The username and password are both `minioadmin`.
 
-Create a bucket named `wumbo-solana-blocks`
+Create a bucket named `solana-blocks`
 
 Next, start up the Process Blocks utility. (This is the Kafka S3 Block Uploader) There should be a vscode task for this.
 
@@ -72,24 +72,19 @@ Next, start up the Event Transform utility. There should be a vscode task for th
 
 Now, events should be streaming into kafka.
 
-If you're starting fresh, your local kafka wont know anything about the existing dev wumbo instance, as those initialize events are long since past. You should instead create a new one.
-
-Go to `/wumbo/rust/` and run `./bootstrap.sh`. Copy the created values into globals.tsx and copy paste the WUM mint into the queries inserting into `wum_locked_by_account`.
-
- Let's load the ksql:
+Let's load the ksql:
 
 ```bash
 docker exec -it ksqldb-cli ksql http://ksqldb-server:8088
 ```
 
-Open up queries.sql and copy them into the command line.
+Open up the sql files in ksql/ and copy them into the command line.
 
 You can use kowl at localhost:8080 to see what's going into the topics.
 
 If you'd like to start the leaderboard, there are vscode launch configs for those as well.
 
-The API is a separate repo, `wumbo-api`
-
+The API is a separate repo, `strata-api`
 
 # Trophies
 
