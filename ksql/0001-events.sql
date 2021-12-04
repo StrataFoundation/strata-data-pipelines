@@ -27,13 +27,51 @@ FROM solana_events
 WHERE EXTRACTJSONFIELD("payload", '$.programId') = 'TBondz6ZwSM5fs4v2GpnVBMuwoncPkFLFR9S422ghhN'
 EMIT CHANGES;
 
-CREATE OR REPLACE STREAM collective_create_unclaimed_tokens
-WITH (kafka_topic='json.solana.collective_create_unclaimed_tokens', value_format='json', partitions=1) 
+CREATE OR REPLACE STREAM spl_token_metadata_events
+WITH (kafka_topic='json.solana.spl_token_metadata_events', value_format='json', partitions=1) 
 AS SELECT
   "slot" AS "slot",
   "blockhash" AS "blockhash",
   "recentBlockhash" AS "recentBlockhash",
   "blockTime" AS "blockTime",
+  "payload" AS "payload",
+  "type" as "type"
+FROM solana_events
+WHERE EXTRACTJSONFIELD("payload", '$.programId') = 'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
+EMIT CHANGES;
+
+CREATE OR REPLACE STREAM create_metadata_events
+WITH (kafka_topic='json.solana.create_metadata_events', value_format='json', partitions=1) 
+AS SELECT
+  "slot" AS "slot",
+  "blockhash" AS "blockhash",
+  "recentBlockhash" AS "recentBlockhash",
+  "blockTime" AS "blockTime",
+  EXTRACTJSONFIELD("payload", '$.instructionIndex') AS "instructionIndex",
+  EXTRACTJSONFIELD("payload", '$.innerIndex') AS "innerIndex",
+  EXTRACTJSONFIELD("payload", '$.data.data.name') AS "name",
+  EXTRACTJSONFIELD("payload", '$.data.data.symbol') AS "symbol",
+  EXTRACTJSONFIELD("payload", '$.data.data.uri') AS "uri",
+  EXTRACTJSONFIELD("payload", '$.data.data.sellerFeeBasisPoints') AS "sellerFeeBasisPoints",
+  EXTRACTJSONFIELD("payload", '$.accounts.tokenMetadata') AS "tokenMetadata",
+  EXTRACTJSONFIELD("payload", '$.accounts.mint') AS "mint",
+  EXTRACTJSONFIELD("payload", '$.accounts.mintAuthority') AS "mintAuthority",
+  EXTRACTJSONFIELD("payload", '$.accounts.payer') AS "payer",
+  EXTRACTJSONFIELD("payload", '$.accounts.updateAuthority') AS "updateAuthority"
+FROM spl_token_metadata_events
+EMIT CHANGES;
+
+CREATE OR REPLACE STREAM collective_create_unclaimed_tokens
+WITH (kafka_topic='json.solana.collective_create_unclaimed_tokens', value_format='json', partitions=1) 
+AS SELECT
+  spl_token_collective_events."slot" AS "slot",
+  spl_token_collective_events."blockhash" AS "blockhash",
+  spl_token_collective_events."recentBlockhash" AS "recentBlockhash",
+  spl_token_collective_events."blockTime" AS "blockTime",
+  create_metadata_events."name" as "tokenMetadataName",
+  create_metadata_events."symbol" as "tokenMetadataSymbol",
+  create_metadata_events."uri" as "tokenMetadataUri",
+  create_metadata_events."tokenMetadata" AS "tokenMetadata",
   EXTRACTJSONFIELD("payload", '$.instructionIndex') AS "instructionIndex",
   EXTRACTJSONFIELD("payload", '$.innerIndex') AS "innerIndex",
   EXTRACTJSONFIELD("payload", '$.data.args.nameParent') AS "nameParent",
@@ -46,11 +84,11 @@ AS SELECT
   EXTRACTJSONFIELD("payload", '$.accounts.initializeArgs.sellBaseRoyalties') AS "sellBaseRoyalties",
   EXTRACTJSONFIELD("payload", '$.accounts.initializeArgs.sellTargetRoyalties') AS "sellTargetRoyalties",
   EXTRACTJSONFIELD("payload", '$.accounts.initializeArgs.targetMint') AS "targetMint",
-  EXTRACTJSONFIELD("payload", '$.accounts.initializeArgs.tokenMetadata') AS "tokenMetadata",
   EXTRACTJSONFIELD("payload", '$.accounts.name') AS "name",
   EXTRACTJSONFIELD("payload", '$.accounts.reverseTokenRef') AS "reverseTokenRef",
   EXTRACTJSONFIELD("payload", '$.accounts.tokenRef') AS "tokenRef"
 FROM spl_token_collective_events
+JOIN create_metadata_events WITHIN 2 HOURS ON create_metadata_events."tokenMetadata" = EXTRACTJSONFIELD("payload", '$.accounts.initializeArgs.tokenMetadata') 
 WHERE "type" = 'initializeUnclaimedSocialTokenV0'
 EMIT CHANGES;
 
