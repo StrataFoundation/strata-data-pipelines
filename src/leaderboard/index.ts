@@ -17,7 +17,7 @@ async function totalWumNetWorthPlugin(payload: EachBatchPayload) {
 async function accountPlugin(payload: EachBatchPayload) {
   const { batch: { messages } } = payload;
   const batch = redisClient.batch()
-  const wumNetWorthMessages = messages
+  const balanceChangeMessages = messages
     .map(m => ({ ...JSON.parse(m.value!.toString()), account: m.key }))
 
   // TODO: Ensure we aren't updating something updated in a more recent slot by another instance of this process.
@@ -28,45 +28,23 @@ async function accountPlugin(payload: EachBatchPayload) {
   // })
   // await promisify(redisClient.mset).bind(redisClient, "account-slots", relevantMessages.flatMap(msg => [msg.pubkey, msg.slot.toString()]))()
 
-  const wumNetWorthByMint = wumNetWorthMessages
-    .reduce((acc, wumNetWorth) => {
-      if (!acc.get(wumNetWorth.mint)) acc.set(wumNetWorth.mint, [])
-      acc.get(wumNetWorth.mint)!.push(wumNetWorth)
+  const balanceChangesByBonding = balanceChangeMessages
+    .reduce((acc, balanceChange) => {
+      if (!acc.get(balanceChange.tokenBonding)) acc.set(balanceChange.tokenBonding, [])
+      acc.get(balanceChange.tokenBonding)!.push(balanceChange)
       return acc;
     }, new Map())
 
-  Array.from(wumNetWorthByMint)
+  Array.from(balanceChangesByBonding)
     .forEach((keyAndValue: any) => {
-      const mint: string = keyAndValue[0];
+      const tokenBonding: string = keyAndValue[0];
       const balanceChanges: any[] = keyAndValue[1];
       const scoresAndValues = balanceChanges.flatMap((balanceChange: any) => {
-        return [Number(balanceChange.tokenAmount), balanceChange.owner]
+        return [Number(balanceChange.tokenAmount), balanceChange.account]
       })
       // @ts-ignore
-      batch.zadd(`accounts-by-balance-${mint}`, 'CH', ...scoresAndValues)
+      batch.zadd(`accounts-by-balance-${tokenBonding}`, 'CH', ...scoresAndValues)
     });
-  const result = await promisify(batch.exec).bind(batch)();
-  const numChanged = result.reduce((a, b) => a + b, 0);
-  console.log(`Upserted ${numChanged} / ${messages.length} values`);
-}
-
-
-async function wumNetWorthPlugin(payload: EachBatchPayload) {
-  const { batch: { messages } } = payload;
-  const batch = redisClient.batch()
-  const wumNetWorthChanges = messages
-    .map(m => ({ ...JSON.parse(m.value!.toString()), account: m.key.toString() }))
-
-  // TODO: Ensure we aren't updating something updated in a more recent slot by another instance of this process.
-  // This was a start, but not working
-  // const slots = await promisify(redisClient.mget).bind(redisClient, "wum-locked-slots", wumNetWorthChanges.map(m => m.account))()
-  // const relevantMessages = wumNetWorthChanges.filter((balanceChange, index) => {
-  //   return Number(slots[index]) < balanceChange.slot
-  // })
-  // await promisify(redisClient.mset).bind(redisClient, "wum-locked-slots", relevantMessages.flatMap(msg => [msg.account, msg.slot]))()
-  const toAdd = wumNetWorthChanges.flatMap(({ account, wumNetWorth }) => [wumNetWorth, account])
-  batch.zadd("wum-net-worth", 'CH', ...toAdd)
-
   const result = await promisify(batch.exec).bind(batch)();
   const numChanged = result.reduce((a, b) => a + b, 0);
   console.log(`Upserted ${numChanged} / ${messages.length} values`);
@@ -75,12 +53,26 @@ async function wumNetWorthPlugin(payload: EachBatchPayload) {
 async function topTokens(payload: EachBatchPayload) {
   const { batch: { messages } } = payload;
   const batch = redisClient.batch()
-  const tokenBalanceChanges = messages
+  const balanceChangeMessages = messages
     .map(m => JSON.parse(m.value!.toString()))
 
-  const toAdd = tokenBalanceChanges.flatMap(({ tokenBonding, supply }) => [supply, tokenBonding])
-  batch.zadd("top-tokens", 'CH', ...toAdd)
+    const balanceChangesByMint = balanceChangeMessages
+    .reduce((acc, balanceChange) => {
+      if (!acc.get(balanceChange.mint)) acc.set(balanceChange.mint, [])
+      acc.get(balanceChange.mint)!.push(balanceChange)
+      return acc;
+    }, new Map())
 
+  Array.from(balanceChangesByMint)
+    .forEach((keyAndValue: any) => {
+      const mint: string = keyAndValue[0];
+      const balanceChanges: any[] = keyAndValue[1];
+      const scoresAndValues = balanceChanges.flatMap((balanceChange: any) => {
+        return [Number(balanceChange.tokenAmount), balanceChange.tokenBonding]
+      })
+      // @ts-ignore
+      batch.zadd(`bonding-by-tvl-${mint}`, 'CH', ...scoresAndValues)
+    });
   const result = await promisify(batch.exec).bind(batch)();
   const numChanged = result.reduce((a, b) => a + b, 0);
   console.log(`Upserted ${numChanged} / ${messages.length} values`);
@@ -88,9 +80,7 @@ async function topTokens(payload: EachBatchPayload) {
 
 const plugins = new Map([
   ["ACCOUNT", accountPlugin],
-  ["WUM_NET_WORTH", wumNetWorthPlugin],
   ["TOP_TOKENS", topTokens],
-  ["TOTAL_WUM_NET_WORTH", totalWumNetWorthPlugin]
 ])
 
 async function run() {

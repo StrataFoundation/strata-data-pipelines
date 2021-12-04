@@ -33,9 +33,9 @@
       "preLaunchTask": "tsc: build - tsconfig.json",
       "outFiles": [
         "${workspaceFolder}/dist/lib/**/*.js"
-      ],Í
+      ],
       "env": {
-        // "SOLANA_URL": "https://api.devnet.solana.com",
+        "SOLANA_URL": " http://127.0.0.1:8899",
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
         "KAFKA_TOPIC": "json.solana.slots",
         // "ACCOUNTS": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL,TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,4K8fnycnTESeyad4DqfXPF8TbkuyscPK4EjAwY35emyW,AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
@@ -54,17 +54,17 @@
         "${workspaceFolder}/dist/lib/**/*.js"
       ],
       "env": {
-        // "SOLANA_URL": "https://api.devnet.solana.com",
+        "SOLANA_URL": "http://127.0.0.1:8899",
         "KAFKA_GROUP_ID": "kafka-s3-block-uploader",
         "S3_ENDPOINT": "http://localhost:9000",
         "S3_ACCESS_KEY_ID": "minioadmin",
         "S3_SECRET_ACCESS_KEY": "minioadmin",
         "S3_PREFIX": "blocks",
-        "S3_BUCKET": "wumbo-solana-blocks",
+        "S3_BUCKET": "strata-blocks",
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
         "KAFKA_INPUT_TOPIC": "json.solana.slots",
         "KAFKA_TOPIC": "json.solana.blocks",
-        "ACCOUNTS": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,namesLPneVptA9Z5rqUDD9tMTWEJwofgaYwp8cawRkX,Bn6owcizWtLgeKcVyXVgUgTvbLezCVz9Q7oPdZu5bC1H,CJMw4wALbZJswJCxLsYUj2ExGCaEgMAp8JSGjodbxAF4"
+        "ACCOUNTS": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,namesLPneVptA9Z5rqUDD9tMTWEJwofgaYwp8cawRkX,TBondz6ZwSM5fs4v2GpnVBMuwoncPkFLFR9S422ghhN,TCo1sP6RwuCuyHPHjxgzcrq4dX4BKf9oRQ3aJMcdFry"
         // "ACCOUNTS": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL,TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,4K8fnycnTESeyad4DqfXPF8TbkuyscPK4EjAwY35emyW,AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
       }
     },
@@ -81,12 +81,13 @@
         "${workspaceFolder}/dist/lib/**/*.js"
       ],
       "env": {
-        "ANCHOR_IDLS": "Bn6owcizWtLgeKcVyXVgUgTvbLezCVz9Q7oPdZu5bC1H,CJMw4wALbZJswJCxLsYUj2ExGCaEgMAp8JSGjodbxAF4",
+        "SOLANA_URL": "http://127.0.0.1:8899",
+        "ANCHOR_IDLS": "TBondz6ZwSM5fs4v2GpnVBMuwoncPkFLFR9S422ghhN,TCo1sP6RwuCuyHPHjxgzcrq4dX4BKf9oRQ3aJMcdFry",
         "S3_ENDPOINT": "http://localhost:9000",
         "S3_ACCESS_KEY_ID": "minioadmin",
         "S3_SECRET_ACCESS_KEY": "minioadmin",
         "S3_PREFIX": "blocks",
-        "S3_BUCKET": "wumbo-solana-blocks",
+        "S3_BUCKET": "strata-blocks",
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
         "KAFKA_INPUT_TOPIC": "json.solana.blocks",
         "KAFKA_OUTPUT_TOPIC": "json.solana.events",
@@ -108,9 +109,9 @@
       ],
       "env": {
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
-        "KAFKA_INPUT_TOPIC": "json.solana.bonding_token_account_balance_changes",
+        "KAFKA_INPUT_TOPIC": "json.solana.latest_bonding_token_account_balances",
         "KAFKA_OFFSET_RESET": "earliest",
-        "KAFKA_GROUP_ID": "account-leaderboard",
+        "KAFKA_GROUP_ID": "account-leaderboard-3",
         "REDIS_HOST": "localhost",
         "REDIS_PORT": "6379"
       }
@@ -118,7 +119,7 @@
     {
       "type": "pwa-node",
       "request": "launch",
-      "name": "WUM Leaderboard Process",
+      "name": "Token Leaderboard Process",
       "skipFiles": [
         "<node_internals>/**"
       ],
@@ -128,11 +129,11 @@
         "${workspaceFolder}/dist/lib/**/*.js"
       ],
       "env": {
-        "PLUGIN": "WUM_LOCKED",
+        "PLUGIN": "TOP_TOKENS",
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
-        "KAFKA_INPUT_TOPIC": "json.solana.total_wum_locked",
+        "KAFKA_INPUT_TOPIC": "json.solana.latest_reserve_token_account_balances",
         "KAFKA_OFFSET_RESET": "earliest",
-        "KAFKA_GROUP_ID": "wum-locked-leaderboard3",
+        "KAFKA_GROUP_ID": "top-token-leaderboard",
         "REDIS_HOST": "localhost",
         "REDIS_PORT": "6379"
       }
@@ -177,7 +178,7 @@
         "S3_ACCESS_KEY_ID": "minioadmin",
         "S3_SECRET_ACCESS_KEY": "minioadmin",
         "S3_PREFIX": "blocks",
-        "S3_BUCKET": "wumbo-solana-blocks",
+        "S3_BUCKET": "strata-blocks",
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
         "KAFKA_TOPIC": "json.solana.blocks",
         "ACCOUNTS": "B97SZXJBRUBHTZiaKB4PwUwzx4N8vkqWV6beAdhiMqqg,BFrD2YQKd8Fz4eeQrUsM8GEFw8UKR4oLWq4xHL6WJNtG"

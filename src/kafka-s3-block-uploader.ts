@@ -116,6 +116,16 @@ async function processSlot(slot: number) {
   })
 }
 
+type PromFunc<A> = () => Promise<A>;
+async function linearPromiseAll<A>(funcs: PromFunc<A>[]): Promise<A[]> {
+  const results = [];
+  for(let func of funcs) {
+    results.push(await func());
+  }
+
+  return results;
+}
+
 async function run() {
   const consumer = kafka.consumer({
     groupId: KAFKA_GROUP_ID!,
@@ -136,12 +146,16 @@ async function run() {
 
   return new Promise((resolve, reject) => {
     consumer.run({
-      eachBatch: async ({ batch: { messages } }) => {
+      eachBatchAutoResolve: false,
+      autoCommitThreshold: 1,
+      eachBatch: async ({ batch: { messages }, resolveOffset, heartbeat }) => {
         try {
-          await Promise.all(
-            messages.map(({ value }) => JSON.parse(value!.toString()).slot).map(slot =>
-              processSlot(slot)
-            )
+          await linearPromiseAll(
+            messages.map(({ value, offset }) => ({ ...JSON.parse(value!.toString()), offset })).map(({ slot, offset }) => async () => {
+              await processSlot(slot)
+              await resolveOffset(offset)
+              await heartbeat()
+            })
           )
         } catch (e) {
           reject(e);

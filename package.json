@@ -1,8 +1,8 @@
 {
-  "name": "kafka-s3-block-uploader",
+  "name": "strata-data-pipelines",
   "version": "0.0.1",
   "private": true,
-  "homepage": "https://wum.bo/",
+  "homepage": "https://stratapotocol.com/",
   "scripts": {
     "run": "ts-node src/event-transformer/index.ts",
     "build": "tsc",
