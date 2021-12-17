@@ -1,0 +1,49 @@
+version: '2'
+services:
+  ksql-bootstrap-1:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    image: confluentinc/ksqldb-cli:0.19.0
+    command: >
+      bash -c "
+      ksql --config-file /config/ksql-server.properties --file /ksql/0001-events.sql http://host.docker.internal:8088 &&
+      ksql --config-file /config/ksql-server.properties --file /ksql/0002-users.sql http://host.docker.internal:8088 &&
+      ksql --config-file /config/ksql-server.properties --file /ksql/0003-bonding-account-balance-changes.sql http://host.docker.internal:8088 && 
+      ksql --config-file /config/ksql-server.properties --file /ksql/0004-reserve-account-balance-changes.sql http://host.docker.internal:8088
+      "
+    volumes:
+      - ../ksql:/ksql
+      - ./:/config
+
+  top-token-leaderboard:
+    restart: always
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    image: data-pipelines:latest
+    command: node dist/lib/leaderboard
+    container_name: top-token-leaderboard
+    environment:
+      PLUGIN: "TOP_TOKENS"
+      KAFKA_BOOTSTRAP_SERVERS: host.docker.internal:39092
+      KAFKA_INPUT_TOPIC: json.solana.latest_reserve_token_account_balances
+      KAFKA_OFFSET_RESET: earliest
+      KAFKA_GROUP_ID: top-token-leaderboard
+      REDIS_HOST: host.docker.internal
+      REDIS_PORT: 6379
+
+  
+  account-leaderboard:
+    restart: always
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    image: data-pipelines:latest
+    command: node dist/lib/leaderboard
+    container_name: account-leaderboard
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: host.docker.internal:39092
+      KAFKA_INPUT_TOPIC: json.solana.latest_bonding_token_account_balances
+      KAFKA_OFFSET_RESET: earliest
+      KAFKA_GROUP_ID: account-leaderboard
+      REDIS_HOST: host.docker.internal
+      REDIS_PORT: 6379
+  

@@ -1,8 +1,8 @@
 CREATE STREAM solana_events ("type" VARCHAR, "slot" BIGINT, "blockTime" BIGINT, "blockhash" VARCHAR, "recentBlockhash" VARCHAR, "payload" VARCHAR)
-WITH (kafka_topic='json.solana.events', value_format='json', partitions=1);
+WITH (kafka_topic='json.solana.events', value_format='json', partitions=1, replicas=1);
 
 CREATE OR REPLACE STREAM spl_token_collective_events
-WITH (kafka_topic='json.solana.spl_token_collective_events', value_format='json', partitions=1) 
+WITH (kafka_topic='json.solana.spl_token_collective_events', value_format='json', partitions=1, replicas=1) 
 AS SELECT
   "slot" AS "slot",
   "blockhash" AS "blockhash",
@@ -15,7 +15,7 @@ WHERE EXTRACTJSONFIELD("payload", '$.programId') = 'TCo1sP6RwuCuyHPHjxgzcrq4dX4B
 EMIT CHANGES;
 
 CREATE OR REPLACE STREAM spl_token_bonding_events
-WITH (kafka_topic='json.solana.spl_token_bonding_events', value_format='json', partitions=1) 
+WITH (kafka_topic='json.solana.spl_token_bonding_events', value_format='json', partitions=1, replicas=1) 
 AS SELECT
   "slot" AS "slot",
   "blockhash" AS "blockhash",
@@ -28,7 +28,7 @@ WHERE EXTRACTJSONFIELD("payload", '$.programId') = 'TBondz6ZwSM5fs4v2GpnVBMuwonc
 EMIT CHANGES;
 
 CREATE OR REPLACE STREAM spl_token_metadata_events
-WITH (kafka_topic='json.solana.spl_token_metadata_events', value_format='json', partitions=1) 
+WITH (kafka_topic='json.solana.spl_token_metadata_events', value_format='json', partitions=1, replicas=1) 
 AS SELECT
   "slot" AS "slot",
   "blockhash" AS "blockhash",
@@ -41,7 +41,7 @@ WHERE EXTRACTJSONFIELD("payload", '$.programId') = 'metaqbxxUerdq28cj1RbAWkYQm3y
 EMIT CHANGES;
 
 CREATE OR REPLACE STREAM create_metadata_events
-WITH (kafka_topic='json.solana.create_metadata_events', value_format='json', partitions=1) 
+WITH (kafka_topic='json.solana.create_metadata_events', value_format='json', partitions=1, replicas=1) 
 AS SELECT
   "slot" AS "slot",
   "blockhash" AS "blockhash",
@@ -62,7 +62,7 @@ FROM spl_token_metadata_events
 EMIT CHANGES;
 
 CREATE OR REPLACE STREAM collective_create_unclaimed_tokens
-WITH (kafka_topic='json.solana.collective_create_unclaimed_tokens', value_format='json', partitions=1) 
+WITH (kafka_topic='json.solana.collective_create_unclaimed_tokens', value_format='json', partitions=1, replicas=1) 
 AS SELECT
   spl_token_collective_events."slot" AS "slot",
   spl_token_collective_events."blockhash" AS "blockhash",
@@ -93,7 +93,7 @@ WHERE "type" = 'initializeUnclaimedSocialTokenV0'
 EMIT CHANGES;
 
 CREATE OR REPLACE STREAM collective_create_owned_tokens
-WITH (kafka_topic='json.solana.collective_create_owned_tokens', value_format='json', partitions=1) 
+WITH (kafka_topic='json.solana.collective_create_owned_tokens', value_format='json', partitions=1, replicas=1) 
 AS SELECT
   "slot" AS "slot",
   "blockhash" AS "blockhash",
@@ -120,7 +120,7 @@ WHERE "type" = 'initializeOwnedSocialTokenV0'
 EMIT CHANGES;
 
 CREATE OR REPLACE STREAM collective_token_claims
-WITH (kafka_topic='json.solana.collective_token_claims', value_format='json', partitions=1) 
+WITH (kafka_topic='json.solana.collective_token_claims', value_format='json', partitions=1, replicas=1) 
 AS SELECT
   "slot" AS "slot",
   "blockhash" AS "blockhash",
@@ -146,7 +146,7 @@ EMIT CHANGES;
 
 
 CREATE OR REPLACE STREAM token_bonding_initializes
-WITH (kafka_topic='json.solana.token_bonding_initializes', value_format='json', partitions=1) 
+WITH (kafka_topic='json.solana.token_bonding_initializes', value_format='json', partitions=1, replicas=1) 
 AS SELECT
   "slot" AS "slot",
   "blockhash" AS "blockhash",
@@ -183,7 +183,7 @@ WHERE "type" = 'initializeTokenBondingV0'
 EMIT CHANGES;
 
 CREATE OR REPLACE STREAM token_account_balance_changes
-WITH (kafka_topic='json.solana.token_account_balance_changes', value_format='json', partitions=1)
+WITH (kafka_topic='json.solana.token_account_balance_changes', value_format='json', partitions=1, replicas=1)
 AS SELECT
   solana_events."type" as "type", 
   solana_events."slot" as "slot", 
@@ -202,7 +202,7 @@ WHERE "type" = 'TokenAccountBalanceChange'
 EMIT CHANGES;
 
 CREATE OR REPLACE STREAM accounts 
-WITH (kafka_topic='json.solana.accounts', value_format='json', partitions=1) 
+WITH (kafka_topic='json.solana.accounts', value_format='json', partitions=1, replicas=1) 
 AS SELECT
   "slot" AS "slot",
   "blockhash" AS "blockhash",

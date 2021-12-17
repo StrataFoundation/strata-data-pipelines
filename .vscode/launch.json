@@ -35,7 +35,7 @@
         "${workspaceFolder}/dist/lib/**/*.js"
       ],
       "env": {
-        "SOLANA_URL": " http://127.0.0.1:8899",
+        "SOLANA_URL": "http://127.0.0.1:8899",
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
         "KAFKA_TOPIC": "json.solana.slots",
         // "ACCOUNTS": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL,TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,4K8fnycnTESeyad4DqfXPF8TbkuyscPK4EjAwY35emyW,AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"

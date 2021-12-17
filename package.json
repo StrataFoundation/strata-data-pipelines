@@ -5,6 +5,7 @@
   "homepage": "https://stratapotocol.com/",
   "scripts": {
     "run": "ts-node src/event-transformer/index.ts",
+    "start": "node dist/lib/index.js",
     "build": "tsc",
     "test": "ts-mocha -p ./tsconfig.json -t 1000000 \"tests/**/*.ts\""
   },

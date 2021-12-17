@@ -8,6 +8,7 @@ const awsConfig: any = {
   s3ForcePathStyle: !!S3_ENDPOINT, // needed with minio?
   signatureVersion: 'v4'
 }
+console.log(awsConfig);
 if (S3_ENDPOINT) {
   awsConfig.endpoint = S3_ENDPOINT;
 }

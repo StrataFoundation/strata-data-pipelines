@@ -119,3 +119,6 @@ dist
 
 test-ledger
 .DS_Store
+
+minio-data/.minio.sys
+minio-data/solana-blocks/blocks

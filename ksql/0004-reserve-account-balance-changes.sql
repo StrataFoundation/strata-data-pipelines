@@ -1,5 +1,5 @@
 CREATE OR REPLACE TABLE token_bonding_base_storage
-WITH (kafka_topic='json.solana.token_bonding_base_storage', value_format='json', partitions=1)
+WITH (kafka_topic='json.solana.token_bonding_base_storage', value_format='json', partitions=1, replicas=1)
 AS
 SELECT LATEST_BY_OFFSET("tokenBonding") as "tokenBonding", "baseStorage"
 FROM token_bonding_initializes
@@ -7,7 +7,7 @@ GROUP BY "baseStorage";
 
 
 CREATE OR REPLACE STREAM reserve_token_account_balance_changes 
-WITH (kafka_topic='json.solana.reserve_token_account_balance_changes', value_format='json', partitions=1) 
+WITH (kafka_topic='json.solana.reserve_token_account_balance_changes', value_format='json', partitions=1, replicas=1) 
 AS SELECT
   token_account_balance_changes."type" as "type", 
   token_account_balance_changes."slot" as "slot", 
@@ -40,10 +40,10 @@ CREATE STREAM latest_reserve_token_account_balances(
   "decimals" INTEGER,
   "tokenBonding" VARCHAR
 )
-  WITH(kafka_topic='json.solana.latest_reserve_token_account_balances', partitions=1, value_format='json');
+  WITH(kafka_topic='json.solana.latest_reserve_token_account_balances', partitions=1, replicas=1, value_format='json');
 
 CREATE OR REPLACE TABLE reserve_token_account_balance_changes_high_watermark
-WITH (kafka_topic='json.solana.reserve_token_account_balance_changes_high_watermark', value_format='json', partitions=1)
+WITH (kafka_topic='json.solana.reserve_token_account_balance_changes_high_watermark', value_format='json', partitions=1, replicas=1)
 AS SELECT "pubkey", MAX("blockTime") as "maxBlockTime"
 FROM latest_reserve_token_account_balances
 GROUP BY "pubkey" 
