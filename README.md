@@ -43,6 +43,12 @@ docker-compose up event-transformer
 
 If you're doing local dev for strata, you'll want our leaderboards. 
 
+First, clone strata api and build:
+
+```
+cd strata-api && docker build . -t strata-api:latest
+```
+
 ```
 cd strata-compose && docker-compose up
 ```

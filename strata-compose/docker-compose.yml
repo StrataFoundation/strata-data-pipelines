@@ -46,4 +46,19 @@ services:
       KAFKA_GROUP_ID: account-leaderboard
       REDIS_HOST: host.docker.internal
       REDIS_PORT: 6379
+
+  strata-api:
+    restart: always
+    ports:
+      - 8083:8083
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    image: strata-api:latest
+    container_name: strata-api
+    environment:
+      REDIS_HOST: host.docker.internal
+      REDIS_PORT: 6379
+      PORT: 8083
+
+
   
