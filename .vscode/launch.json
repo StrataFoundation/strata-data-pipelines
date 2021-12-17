@@ -35,7 +35,7 @@
         "${workspaceFolder}/dist/lib/**/*.js"
       ],
       "env": {
-        "SOLANA_URL": " http://127.0.0.1:8899",
+        "SOLANA_URL": "http://127.0.0.1:8899",
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
         "KAFKA_TOPIC": "json.solana.slots",
         // "ACCOUNTS": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL,TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,4K8fnycnTESeyad4DqfXPF8TbkuyscPK4EjAwY35emyW,AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
@@ -60,7 +60,7 @@
         "S3_ACCESS_KEY_ID": "minioadmin",
         "S3_SECRET_ACCESS_KEY": "minioadmin",
         "S3_PREFIX": "blocks",
-        "S3_BUCKET": "strata-blocks",
+        "S3_BUCKET": "solana-blocks",
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
         "KAFKA_INPUT_TOPIC": "json.solana.slots",
         "KAFKA_TOPIC": "json.solana.blocks",
@@ -87,7 +87,7 @@
         "S3_ACCESS_KEY_ID": "minioadmin",
         "S3_SECRET_ACCESS_KEY": "minioadmin",
         "S3_PREFIX": "blocks",
-        "S3_BUCKET": "strata-blocks",
+        "S3_BUCKET": "solana-blocks",
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
         "KAFKA_INPUT_TOPIC": "json.solana.blocks",
         "KAFKA_OUTPUT_TOPIC": "json.solana.events",
@@ -178,7 +178,7 @@
         "S3_ACCESS_KEY_ID": "minioadmin",
         "S3_SECRET_ACCESS_KEY": "minioadmin",
         "S3_PREFIX": "blocks",
-        "S3_BUCKET": "strata-blocks",
+        "S3_BUCKET": "solana-blocks",
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
         "KAFKA_TOPIC": "json.solana.blocks",
         "ACCOUNTS": "B97SZXJBRUBHTZiaKB4PwUwzx4N8vkqWV6beAdhiMqqg,BFrD2YQKd8Fz4eeQrUsM8GEFw8UKR4oLWq4xHL6WJNtG"
@@ -201,6 +201,30 @@
         "KAFKA_OFFSET_RESET": "earliest",
         "KAFKA_GROUP_ID": "trophies4",
         "SERVICE_ACCOUNT": "[]"
+      }
+    }, {
+      "type": "pwa-node",
+      "request": "launch",
+      "name": "Twitter Annonce Bot",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "program": "${workspaceFolder}/src/twitter-unclaimed-create-bot/index.ts",
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": [
+        "${workspaceFolder}/dist/lib/**/*.js"
+      ],
+      "env": {
+        "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
+        "KAFKA_INPUT_TOPIC": "json.solana.collective_create_unclaimed_tokens",
+        "KAFKA_OFFSET_RESET": "earliest",
+        "KAFKA_GROUP_ID": "unclaimed-create",
+        "TWITTER_CONSUMER_KEY": "Rpql0IOWbAXq01ku0h1Dhkcnw",
+        "TWITTER_CONSUMER_SECRET": "",
+        "TWITTER_ACCESS_TOKEN_KEY": "",
+        "TWITTER_ACCESS_TOKEN_SECRET": "",
+        "COLLECTIVE": "",
+        "MESSAGE": "a social token was created for you on Wum.bo. You can now monetize your social media efforts! For more info and to claim your token, visit wum.bo/claim! You can also simply ignore this message. To shut off the token, message us OPT OUT"
       }
     }
   ]

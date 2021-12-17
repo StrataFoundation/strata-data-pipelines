@@ -1,24 +1,53 @@
 Strata Data Pipelines
 ====================
 
-## Install Deps
-
-### Npm login
-Login with npm, `npm login`
-
-Then,
-
-```bash
-npm token create --read-only
-```
-
-Copy that value as an env var in your bashrc, NPM_TOKEN
-
-## Install
+## Build
 
 ```
-yarn install
+docker build . -t data-pipelines:latest
 ```
+
+## Run Anchor Localnet
+
+Clone your anchor repo (if capturing events for anchor). Otherwise, follow similar steps for you Solana setup.
+
+Run
+
+```
+anchor localnet
+```
+
+Then upload your idl(s) with
+
+```
+anchor idl init <program-id> --filepath <idl.json> --provider.cluster localnet
+```
+
+## Run Data Pipelines
+
+First, update `ACCOUNTS` and `ANCHOR_IDLS` in docker-compose.yml to the programs you would like to capture, and the anchor programs you would like to parse.
+
+Run
+
+```
+docker-compose up
+```
+
+In this repo. You can also run a subset, for example only run up to the event transformer:
+
+```
+docker-compose up event-transformer
+```
+
+## Run Strata
+
+If you're doing local dev for strata, you'll want our leaderboards. 
+
+```
+cd strata-compose && docker-compose up
+```
+
+## Setup kSQL
 
 
 # Components

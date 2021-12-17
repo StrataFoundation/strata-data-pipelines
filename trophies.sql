@@ -4,7 +4,7 @@ CREATE STREAM trophies(
   "trophyMasterEditionMeta" VARCHAR,
   "destination" VARCHAR
 )
-  WITH(kafka_topic='json.solana.trophies', partitions=1, value_format='json');
+  WITH(kafka_topic='json.solana.trophies', partitions=1, replicas=1, value_format='json');
 
 CREATE STREAM raw_wumbo_users("owner" VARCHAR KEY) WITH(kafka_topic='json.solana.wumbo_users_table', value_format='json');
 -- ALPHA TESTERS

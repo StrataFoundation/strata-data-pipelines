@@ -32,7 +32,7 @@ CREATE STREAM missed_slots (
   "key" INT KEY,
   "slot" INT
 )
-WITH (kafka_topic='json.solana.missed_slots', value_format='json', partitions=1);
+WITH (kafka_topic='json.solana.missed_slots', value_format='json', partitions=1, replicas=1);
 INSERT INTO missed_slots
 SELECT "key", "slot"
 FROM raw_retriable_blocks

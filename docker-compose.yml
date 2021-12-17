@@ -14,11 +14,12 @@ services:
       - zookeeper
     ports:
       - 29092:29092
+      - 39092:39092
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_INT://host.docker.internal:39092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,PLAINTEXT_INT:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
@@ -47,6 +48,8 @@ services:
   minio:
     image: minio/minio:latest
     command: "server /data --console-address \":9001\""
+    volumes:
+      - ./minio-data:/data
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
@@ -80,6 +83,11 @@ services:
       KSQL_BOOTSTRAP_SERVERS: kafka:9092
       KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE: "true"
       KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: "true"
+      KSQL_KSQL_INTERNAL_TOPIC_REPLICAS: 1
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_REPLICATION_FACTOR: 1
+      KSQL_KSQL_STREAMS_REPLICATION_FACTOR: 1
+      KSQL_KSQL_SINK_REPLICAS: 1
+      
 
   ksqldb-cli:
     image: confluentinc/ksqldb-cli:0.19.0
@@ -89,3 +97,66 @@ services:
       - ksqldb-server
     entrypoint: /bin/sh
     tty: true
+
+  slot-identifier:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+    image: data-pipelines:latest
+    container_name: slot-identifier
+    command: node dist/lib/kafka-s3-slot-identifier.js
+    depends_on:
+      - kafka
+    environment:
+      SOLANA_URL: "http://host.docker.internal:8899"
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      KAFKA_TOPIC: json.solana.slots
+    
+  block-processor:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+    image: data-pipelines:latest
+    container_name: block-processor
+    command: node dist/lib/kafka-s3-block-uploader.js
+    depends_on:
+      - slot-identifier
+      - kafka
+      - minio
+    environment:
+      SOLANA_URL: "http://host.docker.internal:8899"
+      KAFKA_GROUP_ID: "kafka-s3-block-uploader"
+      S3_ENDPOINT: "http://minio:9000"
+      S3_ACCESS_KEY_ID: "minioadmin"
+      S3_SECRET_ACCESS_KEY: "minioadmin"
+      S3_PREFIX: "blocks"
+      S3_BUCKET: "solana-blocks"
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      KAFKA_INPUT_TOPIC: "json.solana.slots"
+      KAFKA_TOPIC: "json.solana.blocks"
+      ACCOUNTS: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,namesLPneVptA9Z5rqUDD9tMTWEJwofgaYwp8cawRkX,TBondz6ZwSM5fs4v2GpnVBMuwoncPkFLFR9S422ghhN,TCo1sP6RwuCuyHPHjxgzcrq4dX4BKf9oRQ3aJMcdFry"
+
+  event-transformer:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+    image: data-pipelines:latest
+    container_name: event-transformer
+    depends_on:
+      - block-processor
+      - kafka
+      - minio
+    command: node dist/lib/event-transformer
+    environment:
+      SOLANA_URL: "http://host.docker.internal:8899"
+      ANCHOR_IDLS: "TBondz6ZwSM5fs4v2GpnVBMuwoncPkFLFR9S422ghhN,TCo1sP6RwuCuyHPHjxgzcrq4dX4BKf9oRQ3aJMcdFry"
+      S3_ENDPOINT: "http://minio:9000"
+      S3_ACCESS_KEY_ID: "minioadmin"
+      S3_SECRET_ACCESS_KEY: "minioadmin"
+      S3_PREFIX: "blocks"
+      S3_BUCKET: "solana-blocks"
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      KAFKA_INPUT_TOPIC: "json.solana.blocks"
+      KAFKA_OUTPUT_TOPIC: "json.solana.events"
+      KAFKA_OFFSET_RESET: "earliest"
+      KAFKA_GROUP_ID: "solana-event-transformer"
