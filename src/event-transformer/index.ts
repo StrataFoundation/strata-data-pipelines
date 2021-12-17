@@ -1,19 +1,20 @@
+import "./borsh";
+import { Program, Provider, Wallet as NodeWallet } from "@project-serum/anchor";
+import { BlockResponse, Keypair, PublicKey } from "@solana/web3.js";
+import BN from "bn.js";
+import { Message as KafkaMessage, Producer, TopicMessages } from "kafkajs";
 import { kafka } from "../setup/kafka";
 import { s3 } from "../setup/s3";
-import { TokenBalance, Message, BlockResponse, ConfirmedTransactionMeta, PublicKey, Transaction, Keypair } from "@solana/web3.js";
-import { Message as KafkaMessage, Producer, ProducerBatch, TopicMessages } from "kafkajs";
-import { BlockTransaction, Transformer } from "./transformers/Transformer";
-import TokenAccountTransformer from "./transformers/tokenAccounts";
-import BN from "bn.js";
+import { connection } from "../setup/solana";
 import "../utils/borshWithPubkeys";
-import tokenSpec from "./transformers/specs/token";
-import nameSpec from "./transformers/specs/name";
-import associatedTokenSpec from "./transformers/specs/associatedToken";
-import tokenMetadataSpec from "./transformers/specs/tokenMetadata";
-import ProgramSpecTransformer from "./transformers/programSpec";
-import { connection } from "../setup/solana"
-import { Program, Provider, Wallet as NodeWallet } from "@project-serum/anchor";
 import AnchorProgramTransformer from "./transformers/anchorProgram";
+import ProgramSpecTransformer from "./transformers/programSpec";
+import associatedTokenSpec from "./transformers/specs/associatedToken";
+import nameSpec from "./transformers/specs/name";
+import tokenSpec from "./transformers/specs/token";
+import tokenMetadataSpec from "./transformers/specs/tokenMetadata";
+import TokenAccountTransformer from "./transformers/tokenAccounts";
+import { BlockTransaction, Transformer } from "./transformers/Transformer";
 
 const { KAFKA_GROUP_ID, KAFKA_INPUT_TOPIC, KAFKA_OUTPUT_TOPIC } = process.env
 
