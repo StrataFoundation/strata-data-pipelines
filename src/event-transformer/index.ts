@@ -1,10 +1,9 @@
 import "./borsh";
 import { Program, Provider, Wallet as NodeWallet } from "@project-serum/anchor";
-import { BlockResponse, Keypair, PublicKey } from "@solana/web3.js";
+import { BlockResponse, ConfirmedTransaction, Keypair, PublicKey, Transaction } from "@solana/web3.js";
 import BN from "bn.js";
 import { Message as KafkaMessage, Producer, TopicMessages } from "kafkajs";
 import { kafka } from "../setup/kafka";
-import { s3 } from "../setup/s3";
 import { connection } from "../setup/solana";
 import "../utils/borshWithPubkeys";
 import AnchorProgramTransformer from "./transformers/anchorProgram";
@@ -28,8 +27,8 @@ function hasIntersect(set1: Set<any>, set2: Set<any>): boolean {
   return [...set1].some(x => set2.has(x));
 }
 
-function processTxn(transformers: Transformer[], block: BlockResponse & { slot: number }, txn: BlockTransaction): KafkaMessage[] {
-  const accounts = txn.transaction.message.accountKeys.map((key) => (
+function processTxn(transformers: Transformer[], txn: ConfirmedTransaction): KafkaMessage[] {
+  const accounts = txn.transaction.compileMessage().accountKeys.map((key) => (
     // @ts-ignore
     new PublicKey(new BN(key._bn, 'hex'))
   ));
@@ -43,16 +42,15 @@ function processTxn(transformers: Transformer[], block: BlockResponse & { slot: 
       return {
         type,
         payload,
-        slot: block.slot,
-        recentBlockhash: txn.transaction.message.recentBlockhash,
-        blockTime: block.blockTime,
-        blockhash: block.blockhash
+        slot: txn.slot,
+        recentBlockhash: txn.transaction.recentBlockhash,
+        blockTime: txn.blockTime
       }
     })
     .map((item: any) => ({
-      key: block.slot.toString(),
+      key: item.slot.toString(),
       value: JSON.stringify(item),
-      timestamp: ((block.blockTime || 0) * 1000).toString()
+      timestamp: ((item.blockTime || 0) * 1000).toString()
     }))
 }
 
@@ -124,19 +122,12 @@ async function run() {
           const results = (await Promise.all(
             messages
               .map((message: any) => JSON.parse(message.value!.toString()))
-              .filter(item => !item.skipped)
-              .map(async (value: any) => {
-                const s3Resp = (await s3.getObject({
-                  Key: value.Key,
-                  Bucket: value.Bucket
-                }).promise())
-                const block: BlockResponse & { slot: number } = JSON.parse(s3Resp.Body!.toString());
-                const ret: KafkaMessage[] = block.transactions
-                  .filter(txn => !txn.meta?.err)
-                  .flatMap((txn: BlockTransaction) => processTxn(transformers, block, txn))
-  
-                return ret;
-              })
+              .map(txn => ({
+                ...txn,
+                transaction: Transaction.from(txn.transaction)
+              }))
+              .filter((txn: ConfirmedTransaction) => !txn.meta?.err)
+              .flatMap((txn: ConfirmedTransaction) => processTxn(transformers, txn))
           )).flat()
           console.log(`Sending batch of ${results.length} events`)
           await publishFixedBatches(producer, {

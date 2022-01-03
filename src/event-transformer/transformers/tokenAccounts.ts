@@ -1,4 +1,4 @@
-import { PublicKey, TokenBalance } from "@solana/web3.js";
+import { ConfirmedTransaction, PublicKey, TokenBalance } from "@solana/web3.js";
 import { BlockTransaction, Transformer } from "./Transformer";
 import BN from "bn.js";
 
@@ -21,7 +21,7 @@ export default class TokenAccountTransformer implements Transformer {
     return new Set(["TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"])
   }
 
-  transform(accountKeys: PublicKey[], transaction: BlockTransaction): any[] {
+  transform(accountKeys: PublicKey[], transaction: ConfirmedTransaction): any[] {
     function toPubkeyAmount({ accountIndex, mint, uiTokenAmount: { decimals, amount } }: TokenBalance) {
       return {
         mint,
