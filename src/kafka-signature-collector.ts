@@ -49,7 +49,8 @@ async function run() {
       waitForLeaders: true,
       topics: [{
         topic: KAFKA_TOPIC!,
-        numPartitions: process.env.NUM_PARTITIONS ? Number(process.env.NUM_PARTITIONS) : 6
+        numPartitions: process.env.NUM_PARTITIONS ? Number(process.env.NUM_PARTITIONS) : 6,
+        replicationFactor: process.env.REPLICATION ? Number(process.env.REPLICATION) : 1
       }]
     })
     if (!created) {

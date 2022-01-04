@@ -61,27 +61,32 @@ export default class ProgramSpecTransformer extends InstructionTransformer {
   }
 
   transformInstruction(accountKeys: PublicKey[], transaction: ConfirmedTransaction, instruction: CompiledInstruction): any[] {
-    const index = instruction.data.length == 0 ? 0 : new BinaryReader(baseDecode(instruction.data)).readU8();
-    const programId = accountKeys[instruction.programIdIndex].toBase58()
-    const command = this.programIdAndIndexToCommand.get(programId)?.get(index)
-    const schema = this.programIdToSchema.get(programId);
-    if (command) {
-      const accounts = instruction.accounts.reduce((acc, account, index) => {
-        const instrAccount = command.accounts[index]
-        if (instrAccount) {
-          acc.set(instrAccount, accountKeys[account].toBase58());
-        }
-
-        return acc;
-      }, new Map<any, any>());
-
-      const args = command.args && schema && deserializeUnchecked(schema, command.args, baseDecode(instruction.data));
-      return [{
-        type: command.name,
-        programId,
-        accounts: Object.fromEntries(accounts),
-        data: (command.args && Object.fromEntries(transformBN(args)))
-      }]
+    try {
+      const index = instruction.data.length == 0 ? 0 : new BinaryReader(baseDecode(instruction.data)).readU8();
+      const programId = accountKeys[instruction.programIdIndex].toBase58()
+      const command = this.programIdAndIndexToCommand.get(programId)?.get(index)
+      const schema = this.programIdToSchema.get(programId);
+      if (command) {
+        const accounts = instruction.accounts.reduce((acc, account, index) => {
+          const instrAccount = command.accounts[index]
+          if (instrAccount) {
+            acc.set(instrAccount, accountKeys[account].toBase58());
+          }
+  
+          return acc;
+        }, new Map<any, any>());
+  
+        const args = command.args && schema && deserializeUnchecked(schema, command.args, baseDecode(instruction.data));
+        return [{
+          type: command.name,
+          programId,
+          accounts: Object.fromEntries(accounts),
+          data: (command.args && Object.fromEntries(transformBN(args)))
+        }]
+      }
+    } catch (e: any) {
+      console.log(`Failed to process ${transaction.transaction.signature}`);
+      console.error(e);
     }
 
     return [];

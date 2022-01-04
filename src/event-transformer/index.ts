@@ -122,6 +122,7 @@ async function run() {
           const results = (await Promise.all(
             messages
               .map((message: any) => JSON.parse(message.value!.toString()))
+              .filter(txn => txn.transaction)
               .map(txn => ({
                 ...txn,
                 transaction: Transaction.from(txn.transaction)
