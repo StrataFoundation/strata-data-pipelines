@@ -27,6 +27,7 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_NUM_PARTITIONS: 1
+
   kowl:
     image: quay.io/cloudhut/kowl:master
     ports:
@@ -47,17 +48,6 @@ services:
       - zookeeper
     environment:
       ZK_HOSTS: zookeeper:2181
-  minio:
-    image: minio/minio:latest
-    command: "server /data --console-address \":9001\""
-    volumes:
-      - ./minio-data:/data
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    ports:
-      - 9000:9000
-      - 9001:9001
 
   redis:
     image: redis:latest
@@ -100,44 +90,83 @@ services:
     entrypoint: /bin/sh
     tty: true
 
-  slot-identifier:
+  token-signature-identifier:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: always
     image: data-pipelines:latest
-    container_name: slot-identifier
-    command: node dist/lib/kafka-s3-slot-identifier.js
+    command: node dist/lib/kafka-signature-identifier.js
     depends_on:
       - kafka
     environment:
       SOLANA_URL: "http://host.docker.internal:8899"
       KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
-      KAFKA_TOPIC: json.solana.slots
-    
-  block-processor:
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: always
-    image: data-pipelines:latest
-    container_name: block-processor
-    command: node dist/lib/kafka-s3-block-uploader.js
-    depends_on:
-      - slot-identifier
-      - kafka
-      - minio
-    environment:
-      SOLANA_URL: "http://host.docker.internal:8899"
-      KAFKA_GROUP_ID: "kafka-s3-block-uploader"
-      S3_ENDPOINT: "http://minio:9000"
-      S3_ACCESS_KEY_ID: "minioadmin"
-      S3_SECRET_ACCESS_KEY: "minioadmin"
-      S3_PREFIX: "blocks"
-      S3_BUCKET: "solana-blocks"
-      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
-      KAFKA_INPUT_TOPIC: "json.solana.slots"
-      KAFKA_TOPIC: "json.solana.blocks"
-      ACCOUNTS: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,namesLPneVptA9Z5rqUDD9tMTWEJwofgaYwp8cawRkX,TBondz6ZwSM5fs4v2GpnVBMuwoncPkFLFR9S422ghhN,TCo1sP6RwuCuyHPHjxgzcrq4dX4BKf9oRQ3aJMcdFry"
+      KAFKA_TOPIC: json.solana.signatures.token
+      ADDRESS: TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
 
+  atoken-signature-identifier:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+    image: data-pipelines:latest
+    command: node dist/lib/kafka-signature-identifier.js
+    depends_on:
+      - kafka
+    environment:
+      SOLANA_URL: "http://host.docker.internal:8899"
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      KAFKA_TOPIC: json.solana.signatures.atoken
+      ADDRESS: ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL
+
+  name-signature-identifier:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+    image: data-pipelines:latest
+    command: node dist/lib/kafka-signature-identifier.js
+    depends_on:
+      - kafka
+    environment:
+      SOLANA_URL: "http://host.docker.internal:8899"
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      KAFKA_TOPIC: json.solana.signatures.name
+      ADDRESS: namesLPneVptA9Z5rqUDD9tMTWEJwofgaYwp8cawRkX
+
+  signature-collector:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+    image: data-pipelines:latest
+    command: node dist/lib/kafka-signature-collector.js
+    depends_on:
+      - kafka
+      - name-signature-identifier
+      - atoken-signature-identifier
+      - token-signature-identifier
+
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      KAFKA_INPUT_TOPIC: json.solana.signatures..*
+      KAFKA_TOPIC: json.solana.signatures
+      KAFKA_GROUP_ID: kafka-signature-collector
+      KAFKA_OFFSET_RESET: earliest
+
+  signature-processor:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+    image: data-pipelines:latest
+    command: node dist/lib/kafka-signature-processor.js
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      KAFKA_INPUT_TOPIC: json.solana.signatures
+      KAFKA_TOPIC: json.solana.transactions
+      SOLANA_URL: "http://host.docker.internal:8899"
+      KAFKA_GROUP_ID: kafka-signature-processor-1
+      KAFKA_OFFSET_RESET: earliest
+    
   event-transformer:
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -145,20 +174,13 @@ services:
     image: data-pipelines:latest
     container_name: event-transformer
     depends_on:
-      - block-processor
       - kafka
-      - minio
     command: node dist/lib/event-transformer
     environment:
       SOLANA_URL: "http://host.docker.internal:8899"
-      ANCHOR_IDLS: "TBondz6ZwSM5fs4v2GpnVBMuwoncPkFLFR9S422ghhN,TCo1sP6RwuCuyHPHjxgzcrq4dX4BKf9oRQ3aJMcdFry"
-      S3_ENDPOINT: "http://minio:9000"
-      S3_ACCESS_KEY_ID: "minioadmin"
-      S3_SECRET_ACCESS_KEY: "minioadmin"
-      S3_PREFIX: "blocks"
-      S3_BUCKET: "solana-blocks"
+      ANCHOR_IDLS: "TBondmkCYxaPCKG4CHYfVTcwQ8on31xnJrPzk8F8WsS,TCo1sfSr2nCudbeJPykbif64rG9K1JNMGzrtzvPmp3y"
       KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
-      KAFKA_INPUT_TOPIC: "json.solana.blocks"
+      KAFKA_INPUT_TOPIC: "json.solana.transactions"
       KAFKA_OUTPUT_TOPIC: "json.solana.events"
       KAFKA_OFFSET_RESET: "earliest"
       KAFKA_GROUP_ID: "solana-event-transformer"

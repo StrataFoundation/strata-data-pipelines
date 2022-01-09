@@ -25,11 +25,11 @@
     {
       "type": "pwa-node",
       "request": "launch",
-      "name": "Identify Slots",
+      "name": "Signatures",
       "skipFiles": [
         "<node_internals>/**"
       ],
-      "program": "${workspaceFolder}/src/kafka-s3-slot-identifier.ts",
+      "program": "${workspaceFolder}/src/kafka-signature-identifier.ts",
       "preLaunchTask": "tsc: build - tsconfig.json",
       "outFiles": [
         "${workspaceFolder}/dist/lib/**/*.js"
@@ -37,35 +37,90 @@
       "env": {
         "SOLANA_URL": "http://127.0.0.1:8899",
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
-        "KAFKA_TOPIC": "json.solana.slots",
+        "KAFKA_TOPIC": "json.solana.signatures",
+        "ADDRESS": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         // "ACCOUNTS": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL,TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,4K8fnycnTESeyad4DqfXPF8TbkuyscPK4EjAwY35emyW,AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
       }
     },
     {
       "type": "pwa-node",
       "request": "launch",
-      "name": "Process Blocks",
+      "name": "Mainnet Signatures",
       "skipFiles": [
         "<node_internals>/**"
       ],
-      "program": "${workspaceFolder}/src/kafka-s3-block-uploader.ts",
+      "program": "${workspaceFolder}/src/kafka-signature-identifier.ts",
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": [
+        "${workspaceFolder}/dist/lib/**/*.js"
+      ],
+      "env": {
+        "SOLANA_URL": "https://wumbo.genesysgo.net",
+        "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
+        "KAFKA_TOPIC": "json.solana.signatures",
+        "ADDRESS": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        // "ACCOUNTS": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL,TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,4K8fnycnTESeyad4DqfXPF8TbkuyscPK4EjAwY35emyW,AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
+      }
+    },
+    {
+      "type": "pwa-node",
+      "request": "launch",
+      "name": "Mainnet Process Signatures",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "program": "${workspaceFolder}/src/kafka-signature-processor.ts",
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": [
+        "${workspaceFolder}/dist/lib/**/*.js"
+      ],
+      "env": {
+        "SOLANA_URL": "https://wumbo.genesysgo.net",
+        "KAFKA_GROUP_ID": "kafka-signature-processor",
+        "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
+        "KAFKA_INPUT_TOPIC": "json.solana.signatures",
+        "KAFKA_TOPIC": "json.solana.transactions"
+      }
+    },
+    {
+      "type": "pwa-node",
+      "request": "launch",
+      "name": "Process Signatures",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "program": "${workspaceFolder}/src/kafka-signature-processor.ts",
       "preLaunchTask": "tsc: build - tsconfig.json",
       "outFiles": [
         "${workspaceFolder}/dist/lib/**/*.js"
       ],
       "env": {
         "SOLANA_URL": "http://127.0.0.1:8899",
-        "KAFKA_GROUP_ID": "kafka-s3-block-uploader",
-        "S3_ENDPOINT": "http://localhost:9000",
-        "S3_ACCESS_KEY_ID": "minioadmin",
-        "S3_SECRET_ACCESS_KEY": "minioadmin",
-        "S3_PREFIX": "blocks",
-        "S3_BUCKET": "solana-blocks",
+        "KAFKA_GROUP_ID": "kafka-signature-processor",
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
-        "KAFKA_INPUT_TOPIC": "json.solana.slots",
-        "KAFKA_TOPIC": "json.solana.blocks",
-        "ACCOUNTS": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,namesLPneVptA9Z5rqUDD9tMTWEJwofgaYwp8cawRkX,TBondz6ZwSM5fs4v2GpnVBMuwoncPkFLFR9S422ghhN,TCo1sP6RwuCuyHPHjxgzcrq4dX4BKf9oRQ3aJMcdFry"
-        // "ACCOUNTS": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL,TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,4K8fnycnTESeyad4DqfXPF8TbkuyscPK4EjAwY35emyW,AiYPQudWgXerJ1BdKfH5HkEamnPXSHAfPK2ThhKFkkDw"
+        "KAFKA_INPUT_TOPIC": "json.solana.signatures",
+        "KAFKA_TOPIC": "json.solana.transactions",
+      }
+    },
+    {
+      "type": "pwa-node",
+      "request": "launch",
+      "name": "Collect Signatures",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "program": "${workspaceFolder}/src/kafka-signature-collector.ts",
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": [
+        "${workspaceFolder}/dist/lib/**/*.js"
+      ],
+      "env": {
+        "SOLANA_URL": "http://127.0.0.1:8899",
+        "KAFKA_GROUP_ID": "kafka-signature-collector",
+        "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
+        "KAFKA_INPUT_TOPIC": "json.solana.signatures",
+        "KAFKA_TOPIC": "json.solana.collected-signatures",
+        "KAFKA_OFFSET_RESET": "earliest"
       }
     },
     {
@@ -82,16 +137,11 @@
       ],
       "env": {
         "SOLANA_URL": "http://127.0.0.1:8899",
-        "ANCHOR_IDLS": "TBondz6ZwSM5fs4v2GpnVBMuwoncPkFLFR9S422ghhN,TCo1sP6RwuCuyHPHjxgzcrq4dX4BKf9oRQ3aJMcdFry",
-        "S3_ENDPOINT": "http://localhost:9000",
-        "S3_ACCESS_KEY_ID": "minioadmin",
-        "S3_SECRET_ACCESS_KEY": "minioadmin",
-        "S3_PREFIX": "blocks",
-        "S3_BUCKET": "solana-blocks",
+        "ANCHOR_IDLS": "TBondmkCYxaPCKG4CHYfVTcwQ8on31xnJrPzk8F8WsS,TCo1sfSr2nCudbeJPykbif64rG9K1JNMGzrtzvPmp3y",
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
-        "KAFKA_INPUT_TOPIC": "json.solana.blocks",
+        "KAFKA_INPUT_TOPIC": "json.solana.transactions",
         "KAFKA_OUTPUT_TOPIC": "json.solana.events",
-        "KAFKA_OFFSET_RESET": "earliest",
+        "KAFKA_OFFSET_RESET": "latest",
         "KAFKA_GROUP_ID": "solana-event-transformer",
       }
     },

@@ -6,7 +6,7 @@ const ssl = !!KAFKA_SSL_ENABLED
 // This creates a client instance that is configured to connect to the Kafka broker provided by
 // the environment variable KAFKA_BOOTSTRAP_SERVER
 export const kafka = new Kafka({
-  clientId: "kafka-s3-block-uploader",
+  clientId: process.env.GROUP_ID || "no-client-id",
   brokers: process.env.KAFKA_BOOTSTRAP_SERVERS!.split(","),
   ssl,
   sasl

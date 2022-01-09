@@ -1,5 +1,30 @@
 version: '2'
 services:
+  collective-signature-identifier:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+    image: data-pipelines:latest
+    command: node dist/lib/kafka-signature-identifier.js
+    environment:
+      SOLANA_URL: "http://host.docker.internal:8899"
+      KAFKA_BOOTSTRAP_SERVERS: "host.docker.internal:39092"
+      KAFKA_TOPIC: json.solana.signatures.collective
+      ADDRESS: TCo1sfSr2nCudbeJPykbif64rG9K1JNMGzrtzvPmp3y
+    
+  bonding-signature-identifier:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+    image: data-pipelines:latest
+    command: node dist/lib/kafka-signature-identifier.js
+    environment:
+      SOLANA_URL: "http://host.docker.internal:8899"
+      KAFKA_BOOTSTRAP_SERVERS: "host.docker.internal:39092"
+      KAFKA_TOPIC: json.solana.signatures.bonding
+      ADDRESS: TBondmkCYxaPCKG4CHYfVTcwQ8on31xnJrPzk8F8WsS
+    
+
   ksql-bootstrap-1:
     extra_hosts:
       - "host.docker.internal:host-gateway"

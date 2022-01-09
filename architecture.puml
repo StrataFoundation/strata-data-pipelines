@@ -1,8 +1,9 @@
 @startuml architecture
 
 package "Kafka + KSQL" as k {
-  queue blocks
-  queue slots
+  queue signatures_star
+  queue signatures
+  queue transactions
   queue token_account_balance_changes
   queue bonding_token_account_balance_changes
   queue reserve_token_account_balance_changes
@@ -10,8 +11,6 @@ package "Kafka + KSQL" as k {
   queue token_bonding_base_storage #fff
   queue token_bonding_target_mint #fff
   queue events
-  queue token_bonding_supply_changes
-
     
   events --> token_bonding_initializes
 
@@ -24,28 +23,27 @@ package "Kafka + KSQL" as k {
   token_bonding_base_storage --> reserve_token_account_balance_changes
 }
 
-agent KafkaS3BlockUploader
+agent KafkaSignatureIdentifier
 agent AccountLeaderboard
 agent TopTokensLeaderboard
 agent collectiveAPI
-agent SlotIdentiier
+agent KafkaSignatureCollector
+agent KafkaSignatureProcessor
 
 cloud Solana
-cloud S3
 database Redis
 person UI
 
-Solana -> SlotIdentiier
-SlotIdentiier -> slots
-Solana --> KafkaS3BlockUploader
-slots --> KafkaS3BlockUploader
-KafkaS3BlockUploader -> blocks
-KafkaS3BlockUploader -> S3
+Solana -> KafkaSignatureIdentifier
+KafkaSignatureIdentifier --> signatures_star
+signatures_star --> KafkaSignatureCollector
+KafkaSignatureCollector -> signatures
+signatures -> KafkaSignatureProcessor
+KafkaSignatureProcessor --> transactions
 
 agent EventTransformer
 
-S3 -> EventTransformer
-blocks --> EventTransformer
+transactions --> EventTransformer
 EventTransformer -> events
 
 TopTokensLeaderboard --> Redis

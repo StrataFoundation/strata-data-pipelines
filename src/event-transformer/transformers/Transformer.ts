@@ -1,4 +1,4 @@
-import { ConfirmedTransactionMeta, Message, PublicKey } from "@solana/web3.js";
+import { ConfirmedTransaction, ConfirmedTransactionMeta, Message, PublicKey } from "@solana/web3.js";
 
 export type BlockTransaction = {
   transaction: {
@@ -14,5 +14,5 @@ export interface TransformedMessage {
 
 export interface Transformer {
   get relevantKeys(): Set<string>
-  transform(accountKeys: PublicKey[], transaction: BlockTransaction): TransformedMessage[]
+  transform(accountKeys: PublicKey[], transaction: ConfirmedTransaction): TransformedMessage[]
 }
