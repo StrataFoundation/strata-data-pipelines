@@ -58,7 +58,7 @@ async function getKafkaSignature(): Promise<string | null> {
       }
       console.log(`Found signature ${signature} in kafka`)
       resolve(signature)
-    }, 10 * 1000)
+    }, 60 * 1000)
   })
 }
 

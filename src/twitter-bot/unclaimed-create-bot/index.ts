@@ -1,5 +1,5 @@
-import { kafka } from "../setup/kafka";
-import { twitterClient } from "../setup/twitter";
+import { kafka } from "../../setup/kafka";
+import { twitterClient } from "../../setup/twitter";
 
 const { KAFKA_GROUP_ID, KAFKA_INPUT_TOPIC, MESSAGE, COLLECTIVE } = process.env
 
