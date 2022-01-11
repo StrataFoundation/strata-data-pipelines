@@ -110,7 +110,7 @@ async function run() {
         try {
           const toProduceMessages = await promiseAllGrouped(
             process.env.GROUP_SIZE ? Number(process.env.GROUP_SIZE) : 5,
-            messages.map(({ value, offset }) => ({ ...JSON.parse(value!.toString()), offset })).filter(m => m.handle == "redacted_noah" && !m.body.includes("I'm")).map((message) => async () => {
+            messages.map(({ value, offset }) => ({ ...JSON.parse(value!.toString()), offset })).filter(m => m.handle != process.env.HANDLE).map((message) => async () => {
               const handle = message.handle;
               const dm = message.body as string | undefined;
               if (dm?.trim().toUpperCase() === "OPT OUT") {
