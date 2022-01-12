@@ -1,6 +1,7 @@
 import { LRU } from "../../utils/lru";
 import { kafka } from "../../setup/kafka";
 import { twitterClient } from "../../setup/twitter";
+import { truthy } from "../../utils/truthy";
 
 const { KAFKA_TOPIC, POLL_DURATION = 60 * 1000 } = process.env
 
@@ -100,10 +101,6 @@ async function getUserInfo(userId: string): Promise<{ handle: string, name: stri
 
   return ret;
 }
-
-export type Truthy<T> = T extends false | "" | 0 | null | undefined ? never : T; // from lodash
-
-export const truthy = <T>(value: T): value is Truthy<T> => !!value;
 
 async function run() {
   const producer = kafka.producer()

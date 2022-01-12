@@ -68,7 +68,7 @@ function sleep(ms: number) {
   })
 }
 
-async function getAllSignatures(connection: Connection, until?: string, before?: string): Promise<ConfirmedSignatureInfo[]> {
+async function sendAllSignatures(connection: Connection, until?: string, before?: string): Promise<ConfirmedSignatureInfo[]> {
   const signatures = await connection.getConfirmedSignaturesForAddress2(
     ADDRESS,
     {
@@ -78,8 +78,20 @@ async function getAllSignatures(connection: Connection, until?: string, before?:
     FINALITY
   );
 
+  await producer.sendBatch({
+    acks: 1,
+    topicMessages: [{
+      topic: KAFKA_TOPIC!,
+      messages: signatures.map(sig => ({
+        value: JSON.stringify(sig),
+        key: sig.signature.toString(),
+        timestamp: ((sig.blockTime || 0) * 1000).toString()
+      }))
+    }]
+  });
+
   if (signatures.length === 1000) {
-    return [...signatures, ...await getAllSignatures(connection, until, signatures[signatures.length - 1].signature)]
+    await sendAllSignatures(connection, until, signatures[signatures.length - 1].signature)
   }
 
   return signatures;
@@ -112,21 +124,10 @@ async function run() {
   await producer.connect();
   let currentSignature = startSignature;
   while (true) {
-    const signatures = await getAllSignatures(connection, currentSignature || undefined)
+    const signatures = await sendAllSignatures(connection, currentSignature || undefined)
     if (signatures.length > 0) {
       console.log(`Fetched ${signatures.length} signatures from ${currentSignature}`);
       currentSignature = signatures[0].signature
-      await producer.sendBatch({
-        acks: 1,
-        topicMessages: [{
-          topic: KAFKA_TOPIC!,
-          messages: signatures.map(sig => ({
-            value: JSON.stringify(sig),
-            key: sig.signature.toString(),
-            timestamp: ((sig.blockTime || 0) * 1000).toString()
-          }))
-        }]
-      });
     } else {
       await sleep(SLEEP_TIME);
     }
