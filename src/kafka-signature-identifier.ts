@@ -107,7 +107,7 @@ async function run() {
   }
   await admin.disconnect()
 
-  const startSignature = START_SIGNATURE || await getKafkaSignature() || await getSolanaRecentSignature()
+  const startSignature = await getKafkaSignature() || START_SIGNATURE || await getSolanaRecentSignature()
 
   await producer.connect();
   let currentSignature = startSignature;
