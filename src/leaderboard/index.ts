@@ -39,11 +39,15 @@ async function accountPlugin(payload: EachBatchPayload) {
     .forEach((keyAndValue: any) => {
       const tokenBonding: string = keyAndValue[0];
       const balanceChanges: any[] = keyAndValue[1];
-      const scoresAndValues = balanceChanges.flatMap((balanceChange: any) => {
+      const zeroes = balanceChanges.filter(change => change.tokenAmount === 0)
+      const positives = balanceChanges.filter(change => change.tokenAmount !== 0)
+      const scoresAndValues = positives.flatMap((balanceChange: any) => {
         return [Number(balanceChange.tokenAmount), balanceChange.account]
       })
       // @ts-ignore
-      batch.zadd(`accounts-by-balance-${tokenBonding}`, 'CH', ...scoresAndValues)
+      const key = `accounts-by-balance-${tokenBonding}`;
+      batch.zadd(key, 'CH', ...scoresAndValues);
+      batch.zrem(key, ...zeroes.map(z => z.account));
     });
   const result = await promisify(batch.exec).bind(batch)();
   const numChanged = result.reduce((a, b) => a + b, 0);
@@ -67,11 +71,16 @@ async function topTokens(payload: EachBatchPayload) {
     .forEach((keyAndValue: any) => {
       const mint: string = keyAndValue[0];
       const balanceChanges: any[] = keyAndValue[1];
-      const scoresAndValues = balanceChanges.flatMap((balanceChange: any) => {
+      const zeroes = balanceChanges.filter(change => change.tokenAmount === 0)
+      const positives = balanceChanges.filter(change => change.tokenAmount !== 0)
+      const scoresAndValues = positives.flatMap((balanceChange: any) => {
         return [Number(balanceChange.tokenAmount), balanceChange.tokenBonding]
-      })
+      });
+
+      const key = `bonding-by-tvl-${mint}`;
       // @ts-ignore
-      batch.zadd(`bonding-by-tvl-${mint}`, 'CH', ...scoresAndValues)
+      batch.zadd(key, 'CH', ...scoresAndValues);
+      batch.zrem(key, ...zeroes.map(z => z.tokenBonding));
     });
   const result = await promisify(batch.exec).bind(batch)();
   const numChanged = result.reduce((a, b) => a + b, 0);

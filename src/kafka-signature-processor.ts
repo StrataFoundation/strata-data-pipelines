@@ -10,25 +10,30 @@ const producer = kafka.producer()
 
 async function processSignature(signature: ConfirmedSignatureInfo): Promise<any | null> {
   const txn = await connection.getConfirmedTransaction(signature.signature, FINALITY);
-  const data = txn?.transaction.serialize({
-    requireAllSignatures: false,
-    verifySignatures: false
-  }).toJSON().data
-  const value = JSON.stringify({
-    ...txn,
-    transaction: data
-  })
-  const size = Buffer.byteLength(value);
-  if (size > 500000) {
-    console.log("Skipping large message at", signature)
+  try {
+    const data = txn?.transaction.serialize({
+      requireAllSignatures: false,
+      verifySignatures: false
+    }).toJSON().data
+    const value = JSON.stringify({
+      ...txn,
+      transaction: data
+    })
+    const size = Buffer.byteLength(value);
+    if (size > 500000) {
+      console.log("Skipping large message at", signature)
+      return null;
+    }
+  
+    return {
+      key: signature.signature.toString(),
+      value,
+      timestamp: ((signature?.blockTime || 0) * 1000).toString()
+    };
+  } catch (e: any) {
+    console.error(e);
     return null;
   }
-
-  return {
-    key: signature.signature.toString(),
-    value,
-    timestamp: ((signature?.blockTime || 0) * 1000).toString()
-  };
 }
 
 function groupByN<T>(n: number, data: T[]): T[][] {
