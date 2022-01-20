@@ -35,7 +35,7 @@ async function run() {
               const handle = message.tokenMetadataName;
 
               console.log("Sending req");
-              const response = await twitterClient.v2.tweet(`@${handle} ${MESSAGE}`);
+              const response = await twitterClient.v2.tweet(MESSAGE!.replaceAll("{handle}", handle));
               if (response.errors) {
                 console.error(JSON.stringify(response, null, 2));
                 throw new Error("Failed to post tweet")
