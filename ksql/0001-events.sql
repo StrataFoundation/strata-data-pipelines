@@ -40,6 +40,19 @@ FROM solana_events
 WHERE EXTRACTJSONFIELD("payload", '$.programId') = 'metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s'
 EMIT CHANGES;
 
+CREATE OR REPLACE STREAM spl_name_service_events
+WITH (kafka_topic='json.solana.spl_name_service_events', value_format='json', partitions=1, replicas=1) 
+AS SELECT
+  "slot" AS "slot",
+  "blockhash" AS "blockhash",
+  "recentBlockhash" AS "recentBlockhash",
+  "blockTime" AS "blockTime",
+  "payload" AS "payload",
+  "type" as "type"
+FROM solana_events
+WHERE EXTRACTJSONFIELD("payload", '$.programId') = 'namesLPneVptA9Z5rqUDD9tMTWEJwofgaYwp8cawRkX'
+EMIT CHANGES;
+
 CREATE OR REPLACE STREAM create_metadata_events
 WITH (kafka_topic='json.solana.create_metadata_events', value_format='json', partitions=1, replicas=1) 
 AS SELECT
@@ -215,4 +228,42 @@ AS SELECT
   EXTRACTJSONFIELD("payload", '$.accounts.owner') AS "owner"
 FROM solana_events
 WHERE "type" = 'InitializeTokenAccount'
+EMIT CHANGES;
+
+CREATE OR REPLACE STREAM create_name_events
+WITH (kafka_topic='json.solana.create_name_events', value_format='json', partitions=1, replicas=1) 
+AS SELECT
+  "slot" AS "slot",
+  "blockhash" AS "blockhash",
+  "recentBlockhash" AS "recentBlockhash",
+  "blockTime" AS "blockTime",
+  EXTRACTJSONFIELD("payload", '$.instructionIndex') AS "instructionIndex",
+  EXTRACTJSONFIELD("payload", '$.innerIndex') AS "innerIndex",
+  EXTRACTJSONFIELD("payload", '$.data.hashedName') AS "hashedName",
+  EXTRACTJSONFIELD("payload", '$.data.lamports') AS "lamports",
+  EXTRACTJSONFIELD("payload", '$.data.space') AS "space",
+  EXTRACTJSONFIELD("payload", '$.accounts.name') AS "name",
+  EXTRACTJSONFIELD("payload", '$.accounts.owner') AS "owner",
+  EXTRACTJSONFIELD("payload", '$.accounts.class') AS "class",
+  EXTRACTJSONFIELD("payload", '$.accounts.parent') AS "parent",
+  EXTRACTJSONFIELD("payload", '$.accounts.parentOwner') AS "parentOwner"
+FROM spl_name_service_events
+WHERE "type" = 'CreateNameServiceName'
+EMIT CHANGES;
+
+CREATE OR REPLACE STREAM update_name_events
+WITH (kafka_topic='json.solana.update_name_events', value_format='json', partitions=1, replicas=1) 
+AS SELECT
+  "slot" AS "slot",
+  "blockhash" AS "blockhash",
+  "recentBlockhash" AS "recentBlockhash",
+  "blockTime" AS "blockTime",
+  EXTRACTJSONFIELD("payload", '$.instructionIndex') AS "instructionIndex",
+  EXTRACTJSONFIELD("payload", '$.innerIndex') AS "innerIndex",
+  EXTRACTJSONFIELD("payload", '$.data.offset') AS "offset",
+  EXTRACTJSONFIELD("payload", '$.data.data') AS "data",
+  EXTRACTJSONFIELD("payload", '$.accounts.name') AS "name",
+  EXTRACTJSONFIELD("payload", '$.accounts.ownerOrClass') AS "ownerOrClass"
+FROM spl_name_service_events
+WHERE "type" = 'UpdateNameServiceName'
 EMIT CHANGES;

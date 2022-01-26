@@ -259,7 +259,7 @@
       "skipFiles": [
         "<node_internals>/**"
       ],
-      "program": "${workspaceFolder}/src/twitter-unclaimed-create-bot/index.ts",
+      "program": "${workspaceFolder}/src/twitter-bot/unclaimed-create-bot/index.ts",
       "preLaunchTask": "tsc: build - tsconfig.json",
       "outFiles": [
         "${workspaceFolder}/dist/lib/**/*.js"
@@ -275,6 +275,73 @@
         "TWITTER_ACCESS_TOKEN_SECRET": "",
         "COLLECTIVE": "",
         "MESSAGE": "a social token was created for you on Wum.bo. You can now monetize your social media efforts! For more info and to claim your token, visit wum.bo/claim! You can also simply ignore this message. To shut off the token, message us OPT OUT"
+      }
+    }, {
+      "type": "pwa-node",
+      "request": "launch",
+      "name": "Twitter Messages",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "program": "${workspaceFolder}/src/twitter-bot/messages-retriever/index.ts",
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": [
+        "${workspaceFolder}/dist/lib/**/*.js"
+      ],
+      "env": {
+        "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
+        "KAFKA_TOPIC": "json.solana.twitter_bot_messages",
+        "TWITTER_CONSUMER_KEY": "",
+        "TWITTER_CONSUMER_SECRET": "",
+        "TWITTER_ACCESS_TOKEN_KEY": "",
+        "TWITTER_ACCESS_TOKEN_SECRET": "",
+      }
+    }, {
+      "type": "pwa-node",
+      "request": "launch",
+      "name": "Opt Out",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "program": "${workspaceFolder}/src/twitter-bot/opt-out/index.ts",
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": [
+        "${workspaceFolder}/dist/lib/**/*.js"
+      ],
+      "env": {
+        "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
+        "KAFKA_TOPIC": "json.solana.opt_outs",
+        "KAFKA_INPUT_TOPIC": "json.solana.twitter_bot_messages",
+        "KAFKA_GROUP_ID": "opt-out-5",
+        "KAFKA_OFFSET_RESET": "earliest",
+        "SOLANA_URL": "https://api.devnet.solana.com",
+        "TWITTER_TLD": "EEbZHaBD4mreYS6enRqytXvXfmRESLWXXrXbtZLWyd6X",
+        "TWITTER_SERVICE_ACCOUNT": "[65,132,47,88,190,203,121,144,128,74,168,72,223,142,99,217,37,69,160,251,149,35,244,207,84,215,60,50,97,177,113,194,233,135,171,110,133,84,123,5,221,78,104,240,67,217,2,28,6,229,231,56,141,138,249,55,23,239,192,197,165,117,249,85]",
+        "PAYER_SERVICE_ACCOUNT": "[65,132,47,88,190,203,121,144,128,74,168,72,223,142,99,217,37,69,160,251,149,35,244,207,84,215,60,50,97,177,113,194,233,135,171,110,133,84,123,5,221,78,104,240,67,217,2,28,6,229,231,56,141,138,249,55,23,239,192,197,165,117,249,85]",
+        "INCORRECT_MESSAGE_RESPONSE": "I'm sorry, I didn't understand that message. You can say \"OPT OUT\" to opt out.",
+        "HANDLE": "redacted_noah"
+      }
+    }, {
+      "type": "pwa-node",
+      "request": "launch",
+      "name": "Opt Out Response",
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "program": "${workspaceFolder}/src/twitter-bot/opt-out-response/index.ts",
+      "preLaunchTask": "tsc: build - tsconfig.json",
+      "outFiles": [
+        "${workspaceFolder}/dist/lib/**/*.js"
+      ],
+      "env": {
+        "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
+        "KAFKA_INPUT_TOPIC": "json.solana.opt_outs",
+        "KAFKA_GROUP_ID": "opt-out-respond",
+        "KAFKA_OFFSET_RESET": "earliest",
+        "TWITTER_CONSUMER_KEY": "",
+        "TWITTER_CONSUMER_SECRET": "",
+        "TWITTER_ACCESS_TOKEN_KEY": "",
+        "TWITTER_ACCESS_TOKEN_SECRET": "",
       }
     }
   ]
