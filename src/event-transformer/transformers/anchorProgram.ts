@@ -1,4 +1,4 @@
-import { Message, PublicKey, TokenBalance, MessageArgs, CompiledInstruction, ConfirmedTransaction } from "@solana/web3.js";
+import { Message, PublicKey, TokenBalance, MessageArgs, CompiledInstruction, ConfirmedTransaction, TransactionResponse } from "@solana/web3.js";
 import { BlockTransaction, Transformer } from "./Transformer";
 import { BinaryReader, deserializeUnchecked, baseDecode } from "borsh";
 import BN from "bn.js";
@@ -70,7 +70,7 @@ export default class AnchorProgramTransformer extends InstructionTransformer {
     }, {} as Record<string, any>)
   }
 
-  transformInstruction(accountKeys: PublicKey[], transaction: ConfirmedTransaction, instruction: CompiledInstruction | CompiledInstruction): any[] {
+  transformInstruction(accountKeys: PublicKey[], transaction: TransactionResponse & { signature: string }, instruction: CompiledInstruction | CompiledInstruction): any[] {
     const programId = accountKeys[instruction.programIdIndex].toBase58();
     const ixData = bs58.decode(instruction.data);
     let codedInstruction = this.coder.instruction.decode(ixData);

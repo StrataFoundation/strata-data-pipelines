@@ -1,4 +1,4 @@
-import { CompiledInstruction, ConfirmedTransaction, PublicKey, TokenBalance } from "@solana/web3.js";
+import { CompiledInstruction, ConfirmedTransaction, PublicKey, TokenBalance, TransactionResponse } from "@solana/web3.js";
 import { BlockTransaction, Transformer } from "./Transformer";
 import { BinaryReader, deserializeUnchecked, baseDecode } from "borsh";
 import BN from "bn.js";
@@ -60,7 +60,7 @@ export default class ProgramSpecTransformer extends InstructionTransformer {
     return pids;
   }
 
-  transformInstruction(accountKeys: PublicKey[], transaction: ConfirmedTransaction, instruction: CompiledInstruction): any[] {
+  transformInstruction(accountKeys: PublicKey[], transaction: TransactionResponse & { signature: string }, instruction: CompiledInstruction): any[] {
     try {
       const index = instruction.data.length == 0 ? 0 : new BinaryReader(baseDecode(instruction.data)).readU8();
       const programId = accountKeys[instruction.programIdIndex].toBase58()
@@ -85,7 +85,7 @@ export default class ProgramSpecTransformer extends InstructionTransformer {
         }]
       }
     } catch (e: any) {
-      console.log(`Failed to process ${transaction.transaction.signature}`);
+      console.log(`Failed to process ${transaction.signature}`);
       console.error(e);
     }
 

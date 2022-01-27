@@ -13,8 +13,7 @@ describe("anchor-transformer", () => {
     const block: BlockResponse & { slot: number } = blockResp as any;
     const mapped: any = block.transactions.flatMap(txn => {
       const accounts = txn.transaction.message.accountKeys.map((key) => (
-        // @ts-ignore
-        new PublicKey(new BN(key._bn, 'hex'))
+        new PublicKey(key)
       ));
 
       return transformer.transform(accounts, txn)
@@ -34,8 +33,7 @@ describe("anchor-transformer", () => {
     const block: BlockResponse & { slot: number } = wumboBlockResp as any;
     const mapped: any = block.transactions.flatMap(txn => {
       const accounts = txn.transaction.message.accountKeys.map((key) => (
-        // @ts-ignore
-        new PublicKey(new BN(key._bn, 'hex'))
+        new PublicKey(key)
       ));
 
       return transformer.transform(accounts, txn)

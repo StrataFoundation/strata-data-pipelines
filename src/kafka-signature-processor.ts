@@ -9,15 +9,11 @@ const { KAFKA_TOPIC, KAFKA_INPUT_TOPIC, KAFKA_GROUP_ID } = process.env
 const producer = kafka.producer()
 
 async function processSignature(signature: ConfirmedSignatureInfo): Promise<any | null> {
-  const txn = await connection.getConfirmedTransaction(signature.signature, FINALITY);
+  const txn = await connection.getTransaction(signature.signature, { commitment: FINALITY });
   try {
-    const data = txn?.transaction.serialize({
-      requireAllSignatures: false,
-      verifySignatures: false
-    }).toJSON().data
     const value = JSON.stringify({
       ...txn,
-      transaction: data
+      signature: signature.signature.toString()
     })
     const size = Buffer.byteLength(value);
     if (size > 500000) {

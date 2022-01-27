@@ -1,6 +1,6 @@
 import "./borsh";
 import { Program, Provider, Wallet as NodeWallet } from "@project-serum/anchor";
-import { BlockResponse, ConfirmedTransaction, Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import { BlockResponse, ConfirmedTransaction, Keypair, PublicKey, Transaction, TransactionResponse } from "@solana/web3.js";
 import BN from "bn.js";
 import { Message as KafkaMessage, Producer, TopicMessages } from "kafkajs";
 import { kafka } from "../setup/kafka";
@@ -27,11 +27,12 @@ function hasIntersect(set1: Set<any>, set2: Set<any>): boolean {
   return [...set1].some(x => set2.has(x));
 }
 
-function processTxn(transformers: Transformer[], txn: ConfirmedTransaction): KafkaMessage[] {
-  const accounts = txn.transaction.compileMessage().accountKeys.map((key) => (
-    // @ts-ignore
-    new PublicKey(new BN(key._bn, 'hex'))
-  ));
+function processTxn(transformers: Transformer[], txn: TransactionResponse & { signature: string }): KafkaMessage[] {
+  if (!txn.transaction || !txn.transaction.message) {
+    return []
+  }
+  
+  const accounts = txn.transaction.message.accountKeys.map(k => new PublicKey(k));
   const accountsSet = new Set(accounts.map(a => a.toBase58()));
   
   return transformers
@@ -43,8 +44,9 @@ function processTxn(transformers: Transformer[], txn: ConfirmedTransaction): Kaf
         type,
         payload,
         slot: txn.slot,
-        recentBlockhash: txn.transaction.recentBlockhash,
-        blockTime: txn.blockTime
+        recentBlockhash: txn.transaction.message.recentBlockhash,
+        blockTime: txn.blockTime,
+        signatures: txn.signature
       }
     })
     .map((item: any) => ({
@@ -122,13 +124,9 @@ async function run() {
           const results = (await Promise.all(
             messages
               .map((message: any) => JSON.parse(message.value!.toString()))
-              .filter(txn => txn.transaction)
-              .map(txn => ({
-                ...txn,
-                transaction: Transaction.from(txn.transaction)
-              }))
-              .filter((txn: ConfirmedTransaction) => !txn.meta?.err)
-              .flatMap((txn: ConfirmedTransaction) => processTxn(transformers, txn))
+              .filter(txn => txn as TransactionResponse & { signature: string })
+              .filter((txn: TransactionResponse & { signature: string }) => !txn.meta?.err)
+              .flatMap((txn: TransactionResponse & { signature: string }) => processTxn(transformers, txn))
           )).flat()
           console.log(`Sending batch of ${results.length} events`)
           await publishFixedBatches(producer, {
