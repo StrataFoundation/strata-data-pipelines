@@ -16,7 +16,7 @@ async function totalWumNetWorthPlugin(payload: EachBatchPayload) {
 
 async function accountPlugin(payload: EachBatchPayload) {
   const { batch: { messages } } = payload;
-  const batch = redisClient.batch()
+  let batch = redisClient.batch()
   const balanceChangeMessages = messages
     .map(m => ({ ...JSON.parse(m.value!.toString()), account: m.key }))
 
@@ -41,13 +41,19 @@ async function accountPlugin(payload: EachBatchPayload) {
       const balanceChanges: any[] = keyAndValue[1];
       const zeroes = balanceChanges.filter(change => change.tokenAmount === 0)
       const positives = balanceChanges.filter(change => change.tokenAmount !== 0)
-      const scoresAndValues = positives.flatMap((balanceChange: any) => {
-        return [Number(balanceChange.tokenAmount), balanceChange.account]
-      })
+      const scoresAndValues = positives
+        .flatMap((balanceChange: any) => {
+          return [Number(balanceChange.tokenAmount), balanceChange.account]
+        })
       // @ts-ignore
       const key = `accounts-by-balance-${tokenBonding}`;
-      batch.zadd(key, 'CH', ...scoresAndValues);
-      batch.zrem(key, ...zeroes.map(z => z.account));
+      if (scoresAndValues.length > 0) {
+        batch = batch.zadd(key, 'CH', ...scoresAndValues);
+      }
+      if (zeroes.length > 0) {
+        console.log(`Removing ${zeroes.length} zeroes`)
+        batch = batch.zrem(key, ...zeroes.map(z => z.account));        
+      }
     });
   const result = await promisify(batch.exec).bind(batch)();
   const numChanged = result.reduce((a, b) => a + b, 0);

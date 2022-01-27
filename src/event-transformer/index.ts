@@ -28,6 +28,10 @@ function hasIntersect(set1: Set<any>, set2: Set<any>): boolean {
 }
 
 function processTxn(transformers: Transformer[], txn: TransactionResponse & { signature: string }): KafkaMessage[] {
+  if (!txn.transaction || !txn.transaction.message) {
+    return []
+  }
+  
   const accounts = txn.transaction.message.accountKeys.map(k => new PublicKey(k));
   const accountsSet = new Set(accounts.map(a => a.toBase58()));
   
