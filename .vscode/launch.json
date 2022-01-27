@@ -141,8 +141,8 @@
         "KAFKA_BOOTSTRAP_SERVERS": "localhost:29092",
         "KAFKA_INPUT_TOPIC": "json.solana.transactions",
         "KAFKA_OUTPUT_TOPIC": "json.solana.events",
-        "KAFKA_OFFSET_RESET": "latest",
-        "KAFKA_GROUP_ID": "solana-event-transformer",
+        "KAFKA_OFFSET_RESET": "earliest",
+        "KAFKA_GROUP_ID": "solana-event-transformer1",
       }
     },
     {
